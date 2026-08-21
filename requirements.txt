@@ -1,0 +1,5 @@
+streamlit
+FPDF
+pandas
+base64
+io
