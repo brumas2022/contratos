@@ -111,7 +111,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 @st.cache_data(ttl=60)  # Recarrega a cada 60 segundos
 def carregar_dados():
     df_contratos = conn.read(worksheet="Planilha1")
-    df_relatorios = conn.read(worksheet="RELATORIOS")
+    ##df_relatorios = conn.read(worksheet="RELATORIOS")
     return df_contratos, df_relatorios
 
 try:
