@@ -39,7 +39,7 @@ def carregar_dados_google_sheets(sheet_id, gid="0"):
 
 def carregar_dados():
     """Tenta carregar do Google Sheets; se falhar ou se não configurado, usa fallback Excel local."""
-    if SHEET_ID != "SEU_SPREADSHEET_ID_AQUI":
+    if SHEET_ID != "1888864733":
         df_contratos = carregar_dados_google_sheets(SHEET_ID, GID_CONTRATOS)
         df_relatorio = carregar_dados_google_sheets(SHEET_ID, GID_RELATORIOS)
     else:
