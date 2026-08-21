@@ -23,7 +23,7 @@ st.set_page_config(
 # 3. Substitua O_ID_DA_SUA_PLANILHA abaixo pelo ID real (que fica na URL entre /d/ e /edit).
 
 SHEET_ID = "1888864733"
-GID_CONTRATOS = "0"          # ID da aba de Contratos
+GID_CONTRATOS = "1888864733"          # ID da aba de Contratos
 GID_RELATORIOS = "12345678"  # ID da aba de Relatórios Históricos
 
 @st.cache_data(ttl=60)
