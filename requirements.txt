@@ -1,5 +1,5 @@
 streamlit
-FPDF
+fpdf
 pandas
 base64
 
