@@ -22,14 +22,14 @@ st.set_page_config(
 # 2. Vá em Arquivo > Compartilhar > Compartilhar com outras pessoas -> Mude para "Qualquer pessoa com o link".
 # 3. Substitua O_ID_DA_SUA_PLANILHA abaixo pelo ID real (que fica na URL entre /d/ e /edit).
 
-SHEET_ID = "SEU_SPREADSHEET_ID_AQUI"
+SHEET_ID = "1888864733"
 GID_CONTRATOS = "0"          # ID da aba de Contratos
 GID_RELATORIOS = "12345678"  # ID da aba de Relatórios Históricos
 
 @st.cache_data(ttl=60)
 def carregar_dados_google_sheets(sheet_id, gid="0"):
     """Lê dados de uma aba específica do Google Sheets via CSV export."""
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    url = f"https://docs.google.com/spreadsheets/d/1888864733/export?format=csv&gid={gid}" ## https://docs.google.com/spreadsheets/d/1ANxy7fkVPYlldx7_N3Ywm8J8J5aBIX5mKFBpy4E_h_Y/edit?gid=1888864733#gid=1888864733
     try:
         df = pd.read_csv(url)
         return df
