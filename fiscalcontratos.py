@@ -73,7 +73,7 @@ def gerar_pdf_bytes(dados):
     # 2. Prazos e Valores
     pdf.secao_titulo("2. DETALHES FINANCEIROS E LEGAIS")
     pdf.set_font("Arial", "", 9)
-    pdf.cell(95, 6, f" Data Conclusão: {dados['fim']}", border="L")
+    pdf.cell(95, 6, f" Data Conclusão: {dados['data_fim']}", border="L")
     pdf.cell(95, 6, f" Valor do Contrato: R$ {dados['valor']}", border="R", ln=True)
     
     pdf.cell(95, 6, f" Prazo: {dados['prazo']} dias", border="L")
