@@ -184,7 +184,7 @@ if btn_salvar:
     }])
     
     df_atualizado = pd.concat([df_relatorio, novo_registro], ignore_index=True)
-    conn.update(worksheet="RELATORIOS", data=df_atualizado)
+    conn.update(worksheet="Planilha2", data=df_atualizado)
     st.success("✅ Dados salvos com sucesso no Google Sheets!")
     st.cache_data.clear()
 
