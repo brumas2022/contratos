@@ -95,7 +95,7 @@ def gerar_pdf_bytes(dados):
     pdf.cell(110, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="L")
     pdf.cell(80, 6, " ASSINATURA", border="R", ln=True, align="C")
     
-    pdf.cell(110, 6, f" Portaria Nº: {dados['portaria']} | Data: {dados['data_portaria']}", border="L")
+    pdf.cell(110, 6, f" Portaria Nº: {dados['portaria']} | Data: {dados['portaria_data']}", border="L")
     pdf.cell(80, 12, "", border="R", ln=True) # Espaço para assinatura física/digital
     
     pdf.cell(190, 6, f" Relatório Referente a: {dados['data_relatorio']}", border="LRB", ln=True)
