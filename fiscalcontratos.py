@@ -150,7 +150,7 @@ with st.form("form_relatorio"):
         st.write(f"**Valor:** R$ {dados_ctr['valor']}")
     with col2:
         st.write(f"**Fiscal:** {dados_ctr['fiscal']}")
-        st.write(f"**Portaria:** {dados_ctr['portaria_nro']}")
+        st.write(f"**Portaria:** {dados_ctr['portaria']}")
 
     st.markdown("---")
     
