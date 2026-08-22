@@ -58,7 +58,7 @@ def gerar_pdf_bytes(dados):
     
     # Linha 1: Contrato e Abertura
     pdf.cell(95, 6, f" Contrato Nº: {dados['contrato']}", border="L")
-    pdf.cell(95, 6, f" Data de Início: {dados['inicio']}", border="R", ln=True)
+    pdf.cell(95, 6, f" Data de Início: {dados['data_inicio']}", border="R", ln=True)
     
     # Linha 2: Contratada
     pdf.cell(190, 6, f" Contratado(a): {dados['empresa']}", border="LR", ln=True)
