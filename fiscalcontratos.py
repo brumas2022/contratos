@@ -92,7 +92,7 @@ def gerar_pdf_bytes(dados):
     pdf.ln(3)
     pdf.secao_titulo("7. IDENTIFICAÇÃO DO FISCAL")
     pdf.set_font("Arial", "", 9)
-    pdf.cell(110, 6, f" Fiscal de Contrato: {dados['fiscal']}", border="L")
+    pdf.cell(110, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="L")
     pdf.cell(80, 6, " ASSINATURA", border="R", ln=True, align="C")
     
     pdf.cell(110, 6, f" Portaria Nº: {dados['portaria']} | Data: {dados['data_portaria']}", border="L")
