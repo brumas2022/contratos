@@ -157,7 +157,7 @@ with st.form("form_relatorio"):
     ocorrencias_def = ultimo_registro.iloc[0]['OCORRENCIA'] if ultimo_registro is not None else ""
     diligencias_def = ultimo_registro.iloc[0]['DILIGENCIA'] if ultimo_registro is not None else ""
     avaliacao_def = ultimo_registro.iloc[0]['AVALIACAO'] if ultimo_registro is not None else ""
-    obs_def = ultimo_registro.iloc[0]['OBSERVACAO'] if ultimo_registro is not None else ""
+    obs_def = ultimo_registro.iloc[0]['OBSERVAÇÃO'] if ultimo_registro is not None else ""
 
     ocorrencias = st.text_area("Ocorrências", value=ocorrencias_def, height=100)
     diligencias = st.text_area("Diligências, demandas e providências adotadas", value=diligencias_def, height=100)
