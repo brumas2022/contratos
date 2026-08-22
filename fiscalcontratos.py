@@ -58,7 +58,7 @@ def gerar_pdf_bytes(dados):
     
     # Linha 1: Contrato e Abertura
     pdf.cell(95, 6, f" Contrato Nº: {dados['contrato']}", border="L")
-    pdf.cell(95, 6, f" Data de Início: {dados['data_inicio']}", border="R", ln=True)
+    pdf.cell(95, 6, f" Data de Início: {dados['inicio']}", border="R", ln=True)
     
     # Linha 2: Contratada
     pdf.cell(190, 6, f" Contratado(a): {dados['empresa']}", border="LR", ln=True)
@@ -73,7 +73,7 @@ def gerar_pdf_bytes(dados):
     # 2. Prazos e Valores
     pdf.secao_titulo("2. DETALHES FINANCEIROS E LEGAIS")
     pdf.set_font("Arial", "", 9)
-    pdf.cell(95, 6, f" Data Conclusão: {dados['data_fim']}", border="L")
+    pdf.cell(95, 6, f" Data Conclusão: {dados['fim']}", border="L")
     pdf.cell(95, 6, f" Valor do Contrato: R$ {dados['valor']}", border="R", ln=True)
     
     pdf.cell(95, 6, f" Prazo: {dados['prazo']} dias", border="L")
@@ -92,10 +92,10 @@ def gerar_pdf_bytes(dados):
     pdf.ln(3)
     pdf.secao_titulo("7. IDENTIFICAÇÃO DO FISCAL")
     pdf.set_font("Arial", "", 9)
-    pdf.cell(110, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="L")
+    pdf.cell(110, 6, f" Fiscal de Contrato: {dados['fiscal']}", border="L")
     pdf.cell(80, 6, " ASSINATURA", border="R", ln=True, align="C")
     
-    pdf.cell(110, 6, f" Portaria Nº: {dados['portaria_nro']} | Data: {dados['portaria_data']}", border="L")
+    pdf.cell(110, 6, f" Portaria Nº: {dados['portaria']} | Data: {dados['data_portaria']}", border="L")
     pdf.cell(80, 12, "", border="R", ln=True) # Espaço para assinatura física/digital
     
     pdf.cell(190, 6, f" Relatório Referente a: {dados['data_relatorio']}", border="LRB", ln=True)
