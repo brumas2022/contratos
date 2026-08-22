@@ -154,10 +154,10 @@ with st.form("form_relatorio"):
 
     st.markdown("---")
     
-    ocorrencias_def = ultimo_registro.iloc[0]['ocorrencias'] if ultimo_registro is not None else ""
-    diligencias_def = ultimo_registro.iloc[0]['diligencias'] if ultimo_registro is not None else ""
-    avaliacao_def = ultimo_registro.iloc[0]['avaliacao'] if ultimo_registro is not None else ""
-    obs_def = ultimo_registro.iloc[0]['observacao'] if ultimo_registro is not None else ""
+    ocorrencias_def = ultimo_registro.iloc[0]['OCORRENCIA'] if ultimo_registro is not None else ""
+    diligencias_def = ultimo_registro.iloc[0]['DILIGENCIA'] if ultimo_registro is not None else ""
+    avaliacao_def = ultimo_registro.iloc[0]['AVALIACAO'] if ultimo_registro is not None else ""
+    obs_def = ultimo_registro.iloc[0]['OBSERVACAO'] if ultimo_registro is not None else ""
 
     ocorrencias = st.text_area("Ocorrências", value=ocorrencias_def, height=100)
     diligencias = st.text_area("Diligências, demandas e providências adotadas", value=diligencias_def, height=100)
