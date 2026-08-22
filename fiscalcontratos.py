@@ -101,7 +101,7 @@ def gerar_pdf_bytes(dados):
     pdf.cell(190, 6, f" Relatório Referente a: {dados['data_relatorio']}", border="LRB", ln=True)
 
     return pdf.output(dest="S") ##.encode("latin-1", errors="replace")
- --------------------------------------------
+# --------------------------------------------
 # Conexão com Google Sheets via Streamlit GSheetsConnection
 # -----------------------------------------------------------------------------
 conn = st.connection("gsheets", type=GSheetsConnection)
