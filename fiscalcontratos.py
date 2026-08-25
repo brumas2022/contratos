@@ -134,11 +134,12 @@ dados_ctr = df_contratos[df_contratos['contrato'] == nro_contrato].iloc[0]
 st.sidebar.markdown("---")
 st.sidebar.subheader("Empresa Contratada")
 st.sidebar.info(dados_ctr['empresa'])
-st.sidebar.dataframe(df_relatorio['CONTRATO']==nro_contrato)
+
 
 # Busca histórico do relatório mais recente para preencher os campos por padrão
 historico = df_relatorio[df_relatorio['CONTRATO'] == nro_contrato]
 ultimo_registro = historico.tail(1) if not historico.empty else None
+st.sidebar.dataframe(ultimo_registro)
 
 # Formulário de Edição
 with st.form("form_relatorio"):
