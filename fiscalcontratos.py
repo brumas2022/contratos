@@ -175,7 +175,7 @@ if btn_salvar:
     # 1. Atualizar/Inserir no Google Sheets
     novo_registro = pd.DataFrame([{
         "CONTRATO": nro_contrato,
-        "DATA_RELATORIO": data_relatorio_str,
+        "MES": data_relatorio_str,
         "ocorrencias": ocorrencias,
         "diligencias": diligencias,
         "avaliacao": avaliacao,
