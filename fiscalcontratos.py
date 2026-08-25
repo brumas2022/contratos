@@ -134,7 +134,7 @@ dados_ctr = df_contratos[df_contratos['contrato'] == nro_contrato].iloc[0]
 st.sidebar.markdown("---")
 st.sidebar.subheader("Empresa Contratada")
 st.sidebar.info(dados_ctr['empresa'])
-st.sidebar.dataframe(df_relatorio)
+st.sidebar.dataframe(df_relatorio['CONTRATO']==nro_contrato)
 
 # Busca histórico do relatório mais recente para preencher os campos por padrão
 historico = df_relatorio[df_relatorio['CONTRATO'] == nro_contrato]
