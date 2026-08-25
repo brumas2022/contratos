@@ -3,6 +3,7 @@ import pandas as pd
 from fpdf import FPDF
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
+import os
 
 # -----------------------------------------------------------------------------
 # Configuração da Página
@@ -14,15 +15,31 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# Classe PDF com Layout Modernizado e Limpo
+# Classe PDF com Layout Modernizado, Profissional e Suporte a Logotipo
 # -----------------------------------------------------------------------------
 class RelatorioPDF(FPDF):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_margins(12, 12, 12)
+        self.set_auto_page_break(auto=True, margin=15)
+
     def header(self):
-        # Título / Cabeçalho
-        self.set_font("Arial", "B", 12)
-        self.set_text_color(33, 37, 41)
-        self.cell(0, 8, "RELATÓRIO MENSAL DE ACOMPANHAMENTO DE CONTRATO", border=0, ln=True, align="C")
-        self.ln(3)
+        # Inserção do Logotipo (Se existir o arquivo Logosanear1.jpg)
+        logo_path = "Logosanear1.jpg"
+        if os.path.exists(logo_path):
+            # Posiciona o logotipo centralizado no topo (x, y, largura)
+            self.image(logo_path, x=75, y=10, w=60)
+            self.ln(22)  # Dá espaço proporcional para o conteúdo abaixo
+        else:
+            # Caso a imagem não exista localmente, deixa o espaço em branco reservado
+            self.ln(8)
+
+        # Barra decorativa / Título principal
+        self.set_fill_color(24, 43, 73)  # Azul escuro corporativo
+        self.set_text_color(255, 255, 255)
+        self.set_font("Arial", "B", 11)
+        self.cell(0, 8, "RELATÓRIO MENSAL DE ACOMPANHAMENTO DE CONTRATO", border=0, ln=True, align="C", fill=True)
+        self.ln(4)
 
     def footer(self):
         self.set_y(-15)
@@ -31,84 +48,97 @@ class RelatorioPDF(FPDF):
         self.cell(0, 10, f"Página {self.page_no()}", align="C")
 
     def secao_titulo(self, titulo):
-        """Cria um cabeçalho de seção estilizado"""
-        self.set_font("Arial", "B", 10)
-        self.set_fill_color(230, 235, 245)
-        self.set_text_color(24, 43, 73)
+        """Cria um cabeçalho de seção estilizado com fundo azul suave"""
+        self.set_font("Arial", "B", 9)
+        self.set_fill_color(230, 238, 248)  # Tom azul pastel elegante
+        self.set_text_color(24, 43, 73)      # Texto azul escuro
         self.cell(0, 6, f"  {titulo}", border=1, ln=True, fill=True)
         self.set_text_color(0, 0, 0)
 
     def campo_texto(self, titulo, conteudo, altura=20):
-        """Cria blocos de texto dinâmicos com auto-quebra de linha"""
+        """Cria blocos de texto dinâmicos com auto-quebra de linha e layout limpo"""
         self.secao_titulo(titulo)
-        self.set_font("Arial", "", 9)
-        # Usamos multi_cell para evitar que textos longos sejam cortados
-        self.multi_cell(0, 5, conteudo, border="LRB", align="L")
-        self.ln(2)
+        self.set_font("Arial", "", 8.5)
+        
+        # Trata conteúdo vazio
+        texto = conteudo.strip() if conteudo and conteudo.strip() else "Nenhuma ocorrência ou observação registrada."
+        
+        # Multi_cell para evitar que o texto transborde as margens da página
+        self.multi_cell(0, 5, f" {texto}", border="LRB", align="L")
+        self.ln(2.5)
 
 def gerar_pdf_bytes(dados):
     """Gera o arquivo PDF em memória (retorna bytes)"""
     pdf = RelatorioPDF("P", "mm", "A4")
-    pdf.set_auto_page_break(auto=True, margin=15)
-    #pdf.image("Logosanear1.jpg", x=60, y=10, w=90, h=30)
     pdf.add_page()
     
+    # ---------------------------------------------------------
     # 1. Informações Básicas
+    # ---------------------------------------------------------
     pdf.secao_titulo("1. IDENTIFICAÇÃO DO CONTRATO E CONTRATADA")
-    pdf.set_font("Arial", "", 9)
+    pdf.set_font("Arial", "", 8.5)
     
     # Linha 1: Contrato e Abertura
-    pdf.cell(95, 6, f" Contrato Nº: {dados['contrato']}", border="L")
-    pdf.cell(95, 6, f" Data de Início: {dados['data_inicio']}", border="R", ln=True)
+    pdf.cell(93, 6, f" Contrato Nº: {dados['contrato']}", border="L")
+    pdf.cell(93, 6, f" Data de Início: {dados['data_inicio']}", border="R", ln=True)
     
     # Linha 2: Contratada
-    pdf.cell(190, 6, f" Contratado(a): {dados['empresa']}", border="LR", ln=True)
+    pdf.cell(186, 6, f" Contratado(a): {dados['empresa']}", border="LR", ln=True)
     
     # Linha 3: Objeto
-    pdf.set_font("Arial", "B", 9)
-    pdf.cell(190, 5, " Objeto:", border="LR", ln=True)
-    pdf.set_font("Arial", "", 9)
-    pdf.multi_cell(190, 5, f" {dados['objeto']}", border="LRB")
-    pdf.ln(2)
+    pdf.set_font("Arial", "B", 8.5)
+    pdf.cell(186, 5, " Objeto:", border="LR", ln=True)
+    pdf.set_font("Arial", "", 8.5)
+    pdf.multi_cell(186, 5, f" {dados['objeto']}", border="LRB")
+    pdf.ln(2.5)
 
+    # ---------------------------------------------------------
     # 2. Prazos e Valores
+    # ---------------------------------------------------------
     pdf.secao_titulo("2. DETALHES FINANCEIROS E LEGAIS")
-    pdf.set_font("Arial", "", 9)
-    pdf.cell(95, 6, f" Data Conclusão: {dados['data_fim']}", border="L")
-    pdf.cell(95, 6, f" Valor do Contrato: R$ {dados['valor']}", border="R", ln=True)
+    pdf.set_font("Arial", "", 8.5)
     
-    pdf.cell(95, 6, f" Prazo: {dados['prazo']} dias", border="L")
-    pdf.cell(95, 6, f" Licitação: {dados['licitacao']}", border="R", ln=True)
+    pdf.cell(93, 6, f" Data Conclusão: {dados['data_fim']}", border="L")
+    pdf.cell(93, 6, f" Valor do Contrato: R$ {dados['valor']}", border="R", ln=True)
     
-    pdf.cell(190, 6, f" Recurso: {dados['recurso']}", border="LRB", ln=True)
-    pdf.ln(2)
+    pdf.cell(93, 6, f" Prazo: {dados['prazo']} dias", border="L")
+    pdf.cell(93, 6, f" Licitação: {dados['licitacao']}", border="R", ln=True)
+    
+    pdf.cell(186, 6, f" Recurso: {dados['recurso']}", border="LRB", ln=True)
+    pdf.ln(2.5)
 
-    # 3. Textos do Relatório (Desejável que fluam e não cortem)
+    # ---------------------------------------------------------
+    # 3. Textos do Relatório
+    # ---------------------------------------------------------
     pdf.campo_texto("3. OCORRÊNCIAS", dados['ocorrencias'])
     pdf.campo_texto("4. DILIGÊNCIAS, DEMANDAS E PROVIDÊNCIAS ADOTADAS", dados['diligencias'])
     pdf.campo_texto("5. AVALIAÇÃO DOS SERVIÇOS E DOCUMENTOS", dados['avaliacao'])
     pdf.campo_texto("6. OBSERVAÇÕES / SUGESTÕES / RECLAMAÇÕES", dados['obs'])
 
+    # ---------------------------------------------------------
     # 4. Assinatura e Dados do Fiscal
-    pdf.ln(3)
-    pdf.secao_titulo("7. IDENTIFICAÇÃO DO FISCAL")
-    pdf.set_font("Arial", "", 9)
-    pdf.cell(110, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="L")
+    # ---------------------------------------------------------
+    pdf.ln(2)
+    pdf.secao_titulo("7. IDENTIFICAÇÃO DO FISCAL E ASSINATURA")
+    pdf.set_font("Arial", "", 8.5)
+    
+    pdf.cell(106, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="L")
     pdf.cell(80, 6, " ASSINATURA", border="R", ln=True, align="C")
     
-    pdf.cell(110, 6, f" Portaria Nº: {dados['portaria_nro']} | Data: {dados['portaria_data']}", border="L")
-    pdf.cell(80, 12, "", border="R", ln=True) # Espaço para assinatura física/digital
+    pdf.cell(106, 12, f" Portaria Nº: {dados['portaria_nro']} | Data: {dados['portaria_data']}", border="LB")
+    pdf.cell(80, 12, "", border="RB", ln=True) # Espaço reservado para assinatura física ou digital
     
-    pdf.cell(190, 6, f" Relatório Referente a: {dados['data_relatorio']}", border="LRB", ln=True)
+    pdf.set_font("Arial", "I", 8)
+    pdf.cell(186, 6, f" Relatório Referente a: {dados['data_relatorio']}", border="LRB", ln=True, align="R")
 
-    return pdf.output(dest="S") ##.encode("latin-1", errors="replace")
-# --------------------------------------------
+    return pdf.output(dest="S")
+
+# -----------------------------------------------------------------------------
 # Conexão com Google Sheets via Streamlit GSheetsConnection
 # -----------------------------------------------------------------------------
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Carrega os dados das abas (defina os nomes das planilhas/abas no argumento `worksheet`)
-@st.cache_data(ttl=60)  # Recarrega a cada 60 segundos
+@st.cache_data(ttl=60)
 def carregar_dados():
     df_contratos = conn.read(worksheet="Planilha1")
     df_relatorio = conn.read(worksheet="Planilha2")
@@ -125,26 +155,19 @@ except Exception as e:
 # -----------------------------------------------------------------------------
 st.title("📋 Relatório Mensal de Acompanhamento de Contratos")
 
-# Sidebar - Seleção
 lista_contratos = df_contratos['contrato'].dropna().unique().tolist()
 nro_contrato = st.sidebar.selectbox("Escolha o Contrato:", lista_contratos)
 
-# Filtra dados do contrato selecionado
 dados_ctr = df_contratos[df_contratos['contrato'] == nro_contrato].iloc[0]
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Empresa Contratada")
 st.sidebar.info(dados_ctr['empresa'])
 
-
-# Busca histórico do relatório mais recente para preencher os campos por padrão
 historico = df_relatorio[df_relatorio['CONTRATO'] == nro_contrato]
 ultimo_registro = historico.tail(1) if not historico.empty else None
-#st.sidebar.dataframe(ultimo_registro)
-#st.sidebar.dataframe(df_relatorio.loc[df_relatorio['CONTRATO']==nro])
 st.sidebar.dataframe(historico)
 
-# Formulário de Edição
 with st.form("form_relatorio"):
     st.subheader(f"Edição do Relatório - Contrato: {nro_contrato}")
     
@@ -177,7 +200,6 @@ with st.form("form_relatorio"):
 # Processamento e Emissão/Pré-visualização
 # -----------------------------------------------------------------------------
 if btn_salvar:
-    # 1. Atualizar/Inserir no Google Sheets
     novo_registro = pd.DataFrame([{
         "CONTRATO": nro_contrato,
         "MES": data_relatorio_str,
@@ -192,7 +214,6 @@ if btn_salvar:
     st.success("✅ Dados salvos com sucesso no Google Sheets!")
     st.cache_data.clear()
 
-    # 2. Montar Dicionário de Dados para o PDF
     dados_pdf = {
         'contrato': str(nro_contrato),
         'empresa': str(dados_ctr['empresa']),
@@ -213,13 +234,10 @@ if btn_salvar:
         'data_relatorio': data_relatorio_str
     }
 
-    # 3. Gerar Bytes do PDF
     pdf_bytes = bytes(gerar_pdf_bytes(dados_pdf))
 
-    # 4. Pré-visualização e Botão de Download (Resolve o problema de salvar na pasta local)
     st.markdown("### 📄 Pré-visualização e Download do Relatório")
     
     filename_pdf = f"Relatorio_CTR_{str(nro_contrato).replace('/', '-')}.pdf"
     
-    # Botão de download do PDF no navegador do usuário //////mime="application/pdf"
     st.download_button(label="Baixar Relatório em PDF", data=pdf_bytes, file_name=filename_pdf, mime="application/pdf")
