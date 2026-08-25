@@ -217,4 +217,4 @@ if btn_salvar:
     filename_pdf = f"Relatorio_CTR_{str(nro_contrato).replace('/', '-')}.pdf"
     
     # Botão de download do PDF no navegador do usuário
-    st.download_button(label="📥 Baixar Relatório em PDF", data=pdf_bytes, file_name=filename_pdf.pdf, mime="application/pdf")
+    st.download_button(label="📥 Baixar Relatório em PDF", data=pdf_bytes, file_name="filename_pdf.pdf", mime="application/pdf")
