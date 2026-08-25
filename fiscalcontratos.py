@@ -50,6 +50,7 @@ def gerar_pdf_bytes(dados):
     """Gera o arquivo PDF em memória (retorna bytes)"""
     pdf = RelatorioPDF("P", "mm", "A4")
     pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.image("Logosanear1.jpg", x=60, y=10, w=90, h=30)
     pdf.add_page()
     
     # 1. Informações Básicas
