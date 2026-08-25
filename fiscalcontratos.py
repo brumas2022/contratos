@@ -181,7 +181,7 @@ if btn_salvar:
         "OCORRENCIAS": ocorrencias,
         "DILIGENCIA": diligencias,
         "AVALIACAO": avaliacao,
-        "OBSERVACAO": obs
+        "OBSERVAÇÃO": obs
     }])
     
     df_atualizado = pd.concat([df_relatorio, novo_registro], ignore_index=True)
