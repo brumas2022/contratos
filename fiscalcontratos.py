@@ -209,7 +209,7 @@ if btn_salvar:
     }
 
     # 3. Gerar Bytes do PDF
-    pdf_bytes = gerar_pdf_bytes(dados_pdf)
+    pdf_bytes = bytes(gerar_pdf_bytes(dados_pdf))
 
     # 4. Pré-visualização e Botão de Download (Resolve o problema de salvar na pasta local)
     st.markdown("### 📄 Pré-visualização e Download do Relatório")
