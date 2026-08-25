@@ -176,10 +176,10 @@ if btn_salvar:
     novo_registro = pd.DataFrame([{
         "CONTRATO": nro_contrato,
         "MES": data_relatorio_str,
-        "ocorrencias": ocorrencias,
-        "diligencias": diligencias,
-        "avaliacao": avaliacao,
-        "observacao": obs
+        "OCORRENCIAS": ocorrencias,
+        "DILIGENCIA": diligencias,
+        "AVALIACAO": avaliacao,
+        "OBSERVACAO": obs
     }])
     
     df_atualizado = pd.concat([df_relatorio, novo_registro], ignore_index=True)
