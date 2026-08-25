@@ -178,7 +178,7 @@ if btn_salvar:
     novo_registro = pd.DataFrame([{
         "CONTRATO": nro_contrato,
         "MES": data_relatorio_str,
-        "OCORRENCIAS": ocorrencias,
+        "OCORRENCIA": ocorrencias,
         "DILIGENCIA": diligencias,
         "AVALIACAO": avaliacao,
         "OBSERVAÇÃO": obs
