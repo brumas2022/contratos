@@ -37,41 +37,88 @@ def formatar_inteiro(valor):
     except (ValueError, TypeError):
         return str(valor)
 
-def obter_contratos_a_vencer(df, dias=60):
-    """Retorna os contratos que vencem nos próximos 'dias' a partir da data atual"""
+def converter_para_data(valor):
+    """Converte dinamicamente diferentes formatos de entrada para objeto date"""
+    if pd.isna(valor) or valor is None:
+        return None
+    if isinstance(valor, (datetime, pd.Timestamp)):
+        return valor.date()
+    str_data = str(valor).strip()
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(str_data, fmt).date()
+        except ValueError:
+            pass
+    return None
+
+def obter_contratos_a_vencer(df_p1, df_p5, dias=60):
+    """
+    Verifica prazos na Planilha1 (coluna 'fim') e na Planilha5 (colunas de vigência/execução)
+    para o limite de 60 dias a partir de hoje.
+    """
     hoje = datetime.now().date()
     limite = hoje + timedelta(days=dias)
     
     contratos_vencendo = []
     
-    for idx, row in df.iterrows():
-        data_fim_raw = row.get('fim')
-        if pd.isna(data_fim_raw):
-            continue
-            
-        data_fim = None
-        # Tenta converter diferentes formatos de data
-        if isinstance(data_fim_raw, (datetime, pd.Timestamp)):
-            data_fim = data_fim_raw.date()
-        else:
-            str_data = str(data_fim_raw).strip()
-            for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
-                try:
-                    data_fim = datetime.strptime(str_data, fmt).date()
-                    break
-                except ValueError:
-                    pass
+    # 1. Checagem na Planilha1
+    for idx, row in df_p1.iterrows():
+        nro_contrato = row.get('contrato')
+        data_fim = converter_para_data(row.get('fim'))
         
         if data_fim and hoje <= data_fim <= limite:
-            dias_restantes = (data_fim - hoje).days
             contratos_vencendo.append({
-                "Contrato": row['contrato'],
-                "Empresa": row['empresa'],
+                "Contrato": nro_contrato,
+                "Empresa": row.get('empresa', '-'),
+                "Tipo de Prazo": "Fim do Contrato (Planilha1)",
                 "Vencimento": data_fim.strftime("%d/%m/%Y"),
-                "Dias Restantes": dias_restantes
+                "Dias Restantes": (data_fim - hoje).days
             })
+
+    # 2. Checagem na Planilha5 (Buscando por Execução ou Vigência)
+    if df_p5 is not None and not df_p5.empty:
+        # Padroniza os nomes das colunas para busca
+        colunas_p5 = [str(c).lower().strip() for c in df_p5.columns]
+        df_p5_temp = df_p5.copy()
+        df_p5_temp.columns = colunas_p5
+
+        # Identifica colunas alvo na Planilha5
+        col_contrato = next((c for c in colunas_p5 if 'contrato' in c), None)
+        cols_prazos = [c for c in colunas_p5 if any(p in c for p in ['execucao', 'execução', 'vigencia', 'vigência', 'fim'])]
+
+        if col_contrato and cols_prazos:
+            for idx, row in df_p5_temp.iterrows():
+                nro_ctr = row.get(col_contrato)
+                if pd.isna(nro_ctr):
+                    continue
+                
+                # Busca o nome da empresa correspondente na Planilha1
+                empresa_nome = "-"
+                match_p1 = df_p1[df_p1['contrato'] == nro_ctr]
+                if not match_p1.empty:
+                    empresa_nome = match_p1.iloc[0].get('empresa', '-')
+
+                for col_p in cols_prazos:
+                    dt_prazo = converter_para_data(row.get(col_p))
+                    if dt_prazo and hoje <= dt_prazo <= limite:
+                        label_tipo = f"{col_p.replace('_', ' ').title()} (Planilha5)"
+                        
+                        # Evita duplicidade exata de contrato + mesmo tipo
+                        if not any(c['Contrato'] == nro_ctr and c['Tipo de Prazo'] == label_tipo for c in contratos_vencendo):
+                            contratos_vencendo.append({
+                                "Contrato": nro_ctr,
+                                "Empresa": empresa_nome,
+                                "Tipo de Prazo": label_tipo,
+                                "Vencimento": dt_prazo.strftime("%d/%m/%Y"),
+                                "Dias Restantes": (dt_prazo - hoje).days
+                            })
             
-    return pd.DataFrame(contratos_vencendo)
+    df_resultado = pd.DataFrame(contratos_vencendo)
+    if not df_resultado.empty:
+        # Remove duplicatas gerais se existirem registros idênticos
+        df_resultado = df_resultado.drop_duplicates(subset=["Contrato", "Tipo de Prazo", "Vencimento"])
+    
+    return df_resultado
 
 # -----------------------------------------------------------------------------
 # Classe PDF com Layout Modernizado, Profissional e Suporte a Logotipo
@@ -179,10 +226,17 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def carregar_dados():
     df_contratos = conn.read(worksheet="Planilha1")
     df_relatorio = conn.read(worksheet="Planilha2")
-    return df_contratos, df_relatorio
+    
+    # Carrega a Planilha5 se disponível
+    try:
+        df_planilha5 = conn.read(worksheet="Planilha5")
+    except Exception:
+        df_planilha5 = pd.DataFrame()
+        
+    return df_contratos, df_relatorio, df_planilha5
 
 try:
-    df_contratos, df_relatorio = carregar_dados()
+    df_contratos, df_relatorio, df_planilha5 = carregar_dados()
 except Exception as e:
     st.error(f"Erro ao conectar ao Google Sheets: {e}")
     st.stop()
@@ -192,22 +246,22 @@ except Exception as e:
 # -----------------------------------------------------------------------------
 st.title("📋 Relatório Mensal de Acompanhamento de Contratos")
 
-# --- ALERTA DE VENCIMENTOS NA SIDEBAR ---
-df_vencendo = obter_contratos_a_vencer(df_contratos, dias=60)
+# --- ALERTA DE VENCIMENTOS COMBINADO (Planilha1 e Planilha5) NA SIDEBAR ---
+df_vencendo = obter_contratos_a_vencer(df_contratos, df_planilha5, dias=60)
 qtd_vencendo = len(df_vencendo)
 
 st.sidebar.markdown("### ⚠️ Alertador de Prazos")
 if qtd_vencendo > 0:
-    expander_alerta = st.sidebar.expander(f"🔔 Contratos a vencer em 60 dias ({qtd_vencendo})", expanded=False)
+    expander_alerta = st.sidebar.expander(f"🔔 Prazos a vencer em 60 dias ({qtd_vencendo})", expanded=False)
     with expander_alerta:
-        st.warning(f"Existem **{qtd_vencendo}** contrato(s) com término até 60 dias:")
+        st.warning(f"Existem **{qtd_vencendo}** prazo(s) com término até 60 dias:")
         st.dataframe(
             df_vencendo.sort_values(by="Dias Restantes"),
             use_container_width=True,
             hide_index=True
         )
 else:
-    st.sidebar.success("✅ Nenhum contrato a vencer nos próximos 60 dias.")
+    st.sidebar.success("✅ Nenhum prazo a vencer nos próximos 60 dias.")
 
 st.sidebar.markdown("---")
 
