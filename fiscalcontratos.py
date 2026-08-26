@@ -179,6 +179,7 @@ nro_contrato = st.sidebar.selectbox("Escolha o Contrato:", lista_contratos)
 dados_ctr = df_contratos[df_contratos['contrato'] == nro_contrato].iloc[0]
 
 st.sidebar.markdown("---")
+st.sidebar.image("Logosanear1.jpg")
 st.sidebar.subheader("Empresa Contratada")
 st.sidebar.info(dados_ctr['empresa'])
 
