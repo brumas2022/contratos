@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from fpdf import FPDF
-from datetime import datetime
+from datetime import datetime, timedelta
 from streamlit_gsheets import GSheetsConnection
 import os
 
@@ -15,13 +15,12 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# Funções Auxiliares de Formatação
+# Funções Auxiliares de Formatação e Tratamento de Datas
 # -----------------------------------------------------------------------------
 def formatar_moeda_br(valor):
     """Converte valores numéricos para o padrão de moeda brasileiro (ex: 1.234.567,89)"""
     try:
         if isinstance(valor, str):
-            # Limpa possíveis caracteres de formatação prévia
             valor = valor.replace("R$", "").replace(".", "").replace(",", ".").strip()
         val_float = float(valor)
         return f"{val_float:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -37,6 +36,42 @@ def formatar_inteiro(valor):
         return str(int(val_float))
     except (ValueError, TypeError):
         return str(valor)
+
+def obter_contratos_a_vencer(df, dias=60):
+    """Retorna os contratos que vencem nos próximos 'dias' a partir da data atual"""
+    hoje = datetime.now().date()
+    limite = hoje + timedelta(days=dias)
+    
+    contratos_vencendo = []
+    
+    for idx, row in df.iterrows():
+        data_fim_raw = row.get('fim')
+        if pd.isna(data_fim_raw):
+            continue
+            
+        data_fim = None
+        # Tenta converter diferentes formatos de data
+        if isinstance(data_fim_raw, (datetime, pd.Timestamp)):
+            data_fim = data_fim_raw.date()
+        else:
+            str_data = str(data_fim_raw).strip()
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+                try:
+                    data_fim = datetime.strptime(str_data, fmt).date()
+                    break
+                except ValueError:
+                    pass
+        
+        if data_fim and hoje <= data_fim <= limite:
+            dias_restantes = (data_fim - hoje).days
+            contratos_vencendo.append({
+                "Contrato": row['contrato'],
+                "Empresa": row['empresa'],
+                "Vencimento": data_fim.strftime("%d/%m/%Y"),
+                "Dias Restantes": dias_restantes
+            })
+            
+    return pd.DataFrame(contratos_vencendo)
 
 # -----------------------------------------------------------------------------
 # Classe PDF com Layout Modernizado, Profissional e Suporte a Logotipo
@@ -55,7 +90,7 @@ class RelatorioPDF(FPDF):
         else:
             self.ln(8)
 
-        self.set_fill_color(24, 43, 73)  # Azul escuro corporativo
+        self.set_fill_color(24, 43, 73)
         self.set_text_color(255, 255, 255)
         self.set_font("Arial", "B", 11)
         self.cell(0, 8, "RELATÓRIO MENSAL DE ACOMPANHAMENTO DE CONTRATO", border=0, ln=True, align="C", fill=True)
@@ -68,7 +103,6 @@ class RelatorioPDF(FPDF):
         self.cell(0, 10, f"Página {self.page_no()}", align="C")
 
     def secao_titulo(self, titulo):
-        """Cria um cabeçalho de seção estilizado com fundo azul suave"""
         self.set_font("Arial", "B", 9)
         self.set_fill_color(230, 238, 248)
         self.set_text_color(24, 43, 73)
@@ -76,7 +110,6 @@ class RelatorioPDF(FPDF):
         self.set_text_color(0, 0, 0)
 
     def campo_texto(self, titulo, conteudo, altura=20):
-        """Cria blocos de texto dinâmicos com auto-quebra de linha e layout limpo"""
         self.secao_titulo(titulo)
         self.set_font("Arial", "", 8.5)
         texto = conteudo.strip() if conteudo and conteudo.strip() else "Nenhuma ocorrência ou observação registrada."
@@ -84,19 +117,14 @@ class RelatorioPDF(FPDF):
         self.ln(2.5)
 
 def gerar_pdf_bytes(dados):
-    """Gera o arquivo PDF em memória (retorna bytes)"""
     pdf = RelatorioPDF("P", "mm", "A4")
     pdf.add_page()
     
-    # ---------------------------------------------------------
     # 1. Informações Básicas
-    # ---------------------------------------------------------
     pdf.secao_titulo("1. IDENTIFICAÇÃO DO CONTRATO E CONTRATADA")
     pdf.set_font("Arial", "", 8.5)
-    
     pdf.cell(93, 6, f" Contrato Nº: {dados['contrato']}", border="L")
     pdf.cell(93, 6, f" Data de Início: {dados['data_inicio']}", border="R", ln=True)
-    
     pdf.cell(186, 6, f" Contratado(a): {dados['empresa']}", border="LR", ln=True)
     
     pdf.set_font("Arial", "B", 8.5)
@@ -105,9 +133,7 @@ def gerar_pdf_bytes(dados):
     pdf.multi_cell(186, 5, f" {dados['objeto']}", border="LRB")
     pdf.ln(2.5)
 
-    # ---------------------------------------------------------
-    # 2. Prazos e Valores (Com Formatações Ajustadas)
-    # ---------------------------------------------------------
+    # 2. Prazos e Valores
     pdf.secao_titulo("2. DETALHES FINANCEIROS E LEGAIS")
     pdf.set_font("Arial", "", 8.5)
     
@@ -116,24 +142,18 @@ def gerar_pdf_bytes(dados):
     
     pdf.cell(93, 6, f" Data Conclusão: {dados['data_fim']}", border="L")
     pdf.cell(93, 6, f" Valor do Contrato: R$ {valor_formatado}", border="R", ln=True)
-    
     pdf.cell(93, 6, f" Prazo: {prazo_formatado} dias", border="L")
     pdf.cell(93, 6, f" Licitação: {dados['licitacao']}", border="R", ln=True)
-    
     pdf.cell(186, 6, f" Recurso: {dados['recurso']}", border="LRB", ln=True)
     pdf.ln(2.5)
 
-    # ---------------------------------------------------------
     # 3. Textos do Relatório
-    # ---------------------------------------------------------
     pdf.campo_texto("3. OCORRÊNCIAS", dados['ocorrencias'])
     pdf.campo_texto("4. DILIGÊNCIAS, DEMANDAS E PROVIDÊNCIAS ADOTADAS", dados['diligencias'])
     pdf.campo_texto("5. AVALIAÇÃO DOS SERVIÇOS E DOCUMENTOS", dados['avaliacao'])
     pdf.campo_texto("6. OBSERVAÇÕES / SUGESTÕES / RECLAMAÇÕES", dados['obs'])
 
-    # ---------------------------------------------------------
-    # 4. Assinatura e Dados do Fiscal (Com Portaria Inteira)
-    # ---------------------------------------------------------
+    # 4. Assinatura e Dados do Fiscal
     pdf.ln(2)
     pdf.secao_titulo("7. IDENTIFICAÇÃO DO FISCAL E ASSINATURA")
     pdf.set_font("Arial", "", 8.5)
@@ -142,7 +162,6 @@ def gerar_pdf_bytes(dados):
     
     pdf.cell(106, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="L")
     pdf.cell(80, 6, " ASSINATURA", border="R", ln=True, align="C")
-    
     pdf.cell(106, 12, f" Portaria Nº: {portaria_formatada} | Data: {dados['portaria_data']}", border="LB")
     pdf.cell(80, 12, "", border="RB", ln=True)
     
@@ -152,7 +171,7 @@ def gerar_pdf_bytes(dados):
     return pdf.output(dest="S")
 
 # -----------------------------------------------------------------------------
-# Conexão com Google Sheets via Streamlit GSheetsConnection
+# Conexão com Google Sheets
 # -----------------------------------------------------------------------------
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -169,17 +188,34 @@ except Exception as e:
     st.stop()
 
 # -----------------------------------------------------------------------------
-# Interface Principal do Streamlit
+# Interface Principal e Sidebar
 # -----------------------------------------------------------------------------
 st.title("📋 Relatório Mensal de Acompanhamento de Contratos")
-st.sidebar.image("Logosanear1.jpg")
 
+# --- ALERTA DE VENCIMENTOS NA SIDEBAR ---
+df_vencendo = obter_contratos_a_vencer(df_contratos, dias=60)
+qtd_vencendo = len(df_vencendo)
+
+st.sidebar.markdown("### ⚠️ Alertador de Prazos")
+if qtd_vencendo > 0:
+    expander_alerta = st.sidebar.expander(f"🔔 Contratos a vencer em 60 dias ({qtd_vencendo})", expanded=False)
+    with expander_alerta:
+        st.warning(f"Existem **{qtd_vencendo}** contrato(s) com término até 60 dias:")
+        st.dataframe(
+            df_vencendo.sort_values(by="Dias Restantes"),
+            use_container_width=True,
+            hide_index=True
+        )
+else:
+    st.sidebar.success("✅ Nenhum contrato a vencer nos próximos 60 dias.")
+
+st.sidebar.markdown("---")
+
+# Seleção de Contrato
 lista_contratos = df_contratos['contrato'].dropna().unique().tolist()
 nro_contrato = st.sidebar.selectbox("Escolha o Contrato:", lista_contratos)
 
 dados_ctr = df_contratos[df_contratos['contrato'] == nro_contrato].iloc[0]
-
-st.sidebar.markdown("---")
 
 st.sidebar.subheader("Empresa Contratada")
 st.sidebar.info(dados_ctr['empresa'])
@@ -188,6 +224,7 @@ historico = df_relatorio[df_relatorio['CONTRATO'] == nro_contrato]
 ultimo_registro = historico.tail(1) if not historico.empty else None
 st.sidebar.dataframe(historico)
 
+# Formulário de Edição
 with st.form("form_relatorio"):
     st.subheader(f"Edição do Relatório - Contrato: {nro_contrato}")
     
@@ -257,13 +294,5 @@ if btn_salvar:
     pdf_bytes = bytes(gerar_pdf_bytes(dados_pdf))
 
     st.markdown("### 📄 Pré-visualização e Download do Relatório")
-    
     filename_pdf = f"Relatorio_CTR_{str(nro_contrato).replace('/', '-')}.pdf"
-    
     st.download_button(label="Baixar Relatório em PDF", data=pdf_bytes, file_name=filename_pdf, mime="application/pdf")
-
-    ##st.markdown("### 📄 Pré-visualização e Download do Relatório")
-    
-    ##filename_pdf = f"Relatorio_CTR_{str(nro_contrato).replace('/', '-')}.pdf"
-    
-    ##st.download_button(label="Baixar Relatório em PDF", data=pdf_bytes, file_name=filename_pdf, mime="application/pdf")
