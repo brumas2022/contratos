@@ -15,6 +15,30 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
+# Funções Auxiliares de Formatação
+# -----------------------------------------------------------------------------
+def formatar_moeda_br(valor):
+    """Converte valores numéricos para o padrão de moeda brasileiro (ex: 1.234.567,89)"""
+    try:
+        if isinstance(valor, str):
+            # Limpa possíveis caracteres de formatação prévia
+            valor = valor.replace("R$", "").replace(".", "").replace(",", ".").strip()
+        val_float = float(valor)
+        return f"{val_float:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except (ValueError, TypeError):
+        return str(valor)
+
+def formatar_inteiro(valor):
+    """Garante que o valor seja exibido como número inteiro, sem casas decimais"""
+    try:
+        if isinstance(valor, str):
+            valor = valor.replace(",", ".").strip()
+        val_float = float(valor)
+        return str(int(val_float))
+    except (ValueError, TypeError):
+        return str(valor)
+
+# -----------------------------------------------------------------------------
 # Classe PDF com Layout Modernizado, Profissional e Suporte a Logotipo
 # -----------------------------------------------------------------------------
 class RelatorioPDF(FPDF):
@@ -24,17 +48,13 @@ class RelatorioPDF(FPDF):
         self.set_auto_page_break(auto=True, margin=15)
 
     def header(self):
-        # Inserção do Logotipo (Se existir o arquivo Logosanear1.jpg)
         logo_path = "Logosanear1.jpg"
         if os.path.exists(logo_path):
-            # Posiciona o logotipo centralizado no topo (x, y, largura)
             self.image(logo_path, x=75, y=10, w=60)
-            self.ln(22)  # Dá espaço proporcional para o conteúdo abaixo
+            self.ln(22)
         else:
-            # Caso a imagem não exista localmente, deixa o espaço em branco reservado
             self.ln(8)
 
-        # Barra decorativa / Título principal
         self.set_fill_color(24, 43, 73)  # Azul escuro corporativo
         self.set_text_color(255, 255, 255)
         self.set_font("Arial", "B", 11)
@@ -50,8 +70,8 @@ class RelatorioPDF(FPDF):
     def secao_titulo(self, titulo):
         """Cria um cabeçalho de seção estilizado com fundo azul suave"""
         self.set_font("Arial", "B", 9)
-        self.set_fill_color(230, 238, 248)  # Tom azul pastel elegante
-        self.set_text_color(24, 43, 73)      # Texto azul escuro
+        self.set_fill_color(230, 238, 248)
+        self.set_text_color(24, 43, 73)
         self.cell(0, 6, f"  {titulo}", border=1, ln=True, fill=True)
         self.set_text_color(0, 0, 0)
 
@@ -59,11 +79,7 @@ class RelatorioPDF(FPDF):
         """Cria blocos de texto dinâmicos com auto-quebra de linha e layout limpo"""
         self.secao_titulo(titulo)
         self.set_font("Arial", "", 8.5)
-        
-        # Trata conteúdo vazio
         texto = conteudo.strip() if conteudo and conteudo.strip() else "Nenhuma ocorrência ou observação registrada."
-        
-        # Multi_cell para evitar que o texto transborde as margens da página
         self.multi_cell(0, 5, f" {texto}", border="LRB", align="L")
         self.ln(2.5)
 
@@ -78,14 +94,11 @@ def gerar_pdf_bytes(dados):
     pdf.secao_titulo("1. IDENTIFICAÇÃO DO CONTRATO E CONTRATADA")
     pdf.set_font("Arial", "", 8.5)
     
-    # Linha 1: Contrato e Abertura
     pdf.cell(93, 6, f" Contrato Nº: {dados['contrato']}", border="L")
     pdf.cell(93, 6, f" Data de Início: {dados['data_inicio']}", border="R", ln=True)
     
-    # Linha 2: Contratada
     pdf.cell(186, 6, f" Contratado(a): {dados['empresa']}", border="LR", ln=True)
     
-    # Linha 3: Objeto
     pdf.set_font("Arial", "B", 8.5)
     pdf.cell(186, 5, " Objeto:", border="LR", ln=True)
     pdf.set_font("Arial", "", 8.5)
@@ -93,15 +106,18 @@ def gerar_pdf_bytes(dados):
     pdf.ln(2.5)
 
     # ---------------------------------------------------------
-    # 2. Prazos e Valores
+    # 2. Prazos e Valores (Com Formatações Ajustadas)
     # ---------------------------------------------------------
     pdf.secao_titulo("2. DETALHES FINANCEIROS E LEGAIS")
     pdf.set_font("Arial", "", 8.5)
     
-    pdf.cell(93, 6, f" Data Conclusão: {dados['data_fim']}", border="L")
-    pdf.cell(93, 6, f" Valor do Contrato: R$ {dados['valor']}", border="R", ln=True)
+    valor_formatado = formatar_moeda_br(dados['valor'])
+    prazo_formatado = formatar_inteiro(dados['prazo'])
     
-    pdf.cell(93, 6, f" Prazo: {dados['prazo']} dias", border="L")
+    pdf.cell(93, 6, f" Data Conclusão: {dados['data_fim']}", border="L")
+    pdf.cell(93, 6, f" Valor do Contrato: R$ {valor_formatado}", border="R", ln=True)
+    
+    pdf.cell(93, 6, f" Prazo: {prazo_formatado} dias", border="L")
     pdf.cell(93, 6, f" Licitação: {dados['licitacao']}", border="R", ln=True)
     
     pdf.cell(186, 6, f" Recurso: {dados['recurso']}", border="LRB", ln=True)
@@ -116,17 +132,19 @@ def gerar_pdf_bytes(dados):
     pdf.campo_texto("6. OBSERVAÇÕES / SUGESTÕES / RECLAMAÇÕES", dados['obs'])
 
     # ---------------------------------------------------------
-    # 4. Assinatura e Dados do Fiscal
+    # 4. Assinatura e Dados do Fiscal (Com Portaria Inteira)
     # ---------------------------------------------------------
     pdf.ln(2)
     pdf.secao_titulo("7. IDENTIFICAÇÃO DO FISCAL E ASSINATURA")
     pdf.set_font("Arial", "", 8.5)
     
+    portaria_formatada = formatar_inteiro(dados['portaria_nro'])
+    
     pdf.cell(106, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="L")
     pdf.cell(80, 6, " ASSINATURA", border="R", ln=True, align="C")
     
-    pdf.cell(106, 12, f" Portaria Nº: {dados['portaria_nro']} | Data: {dados['portaria_data']}", border="LB")
-    pdf.cell(80, 12, "", border="RB", ln=True) # Espaço reservado para assinatura física ou digital
+    pdf.cell(106, 12, f" Portaria Nº: {portaria_formatada} | Data: {dados['portaria_data']}", border="LB")
+    pdf.cell(80, 12, "", border="RB", ln=True)
     
     pdf.set_font("Arial", "I", 8)
     pdf.cell(186, 6, f" Relatório Referente a: {dados['data_relatorio']}", border="LRB", ln=True, align="R")
@@ -174,10 +192,10 @@ with st.form("form_relatorio"):
     col1, col2 = st.columns(2)
     with col1:
         st.write(f"**Empresa:** {dados_ctr['empresa']}")
-        st.write(f"**Valor:** R$ {dados_ctr['valor']}")
+        st.write(f"**Valor:** R$ {formatar_moeda_br(dados_ctr['valor'])}")
     with col2:
         st.write(f"**Fiscal:** {dados_ctr['fiscal']}")
-        st.write(f"**Portaria:** {dados_ctr['portaria']}")
+        st.write(f"**Portaria:** {formatar_inteiro(dados_ctr['portaria'])}")
 
     st.markdown("---")
     
@@ -235,6 +253,12 @@ if btn_salvar:
     }
 
     pdf_bytes = bytes(gerar_pdf_bytes(dados_pdf))
+
+    st.markdown("### 📄 Pré-visualização e Download do Relatório")
+    
+    filename_pdf = f"Relatorio_CTR_{str(nro_contrato).replace('/', '-')}.pdf"
+    
+    st.download_button(label="Baixar Relatório em PDF", data=pdf_bytes, file_name=filename_pdf, mime="application/pdf")
 
     st.markdown("### 📄 Pré-visualização e Download do Relatório")
     
