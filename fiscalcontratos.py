@@ -172,6 +172,7 @@ except Exception as e:
 # Interface Principal do Streamlit
 # -----------------------------------------------------------------------------
 st.title("📋 Relatório Mensal de Acompanhamento de Contratos")
+st.sidebar.image("Logosanear1.jpg")
 
 lista_contratos = df_contratos['contrato'].dropna().unique().tolist()
 nro_contrato = st.sidebar.selectbox("Escolha o Contrato:", lista_contratos)
@@ -179,7 +180,7 @@ nro_contrato = st.sidebar.selectbox("Escolha o Contrato:", lista_contratos)
 dados_ctr = df_contratos[df_contratos['contrato'] == nro_contrato].iloc[0]
 
 st.sidebar.markdown("---")
-st.sidebar.image("Logosanear1.jpg")
+
 st.sidebar.subheader("Empresa Contratada")
 st.sidebar.info(dados_ctr['empresa'])
 
