@@ -260,8 +260,8 @@ if btn_salvar:
     
     st.download_button(label="Baixar Relatório em PDF", data=pdf_bytes, file_name=filename_pdf, mime="application/pdf")
 
-    st.markdown("### 📄 Pré-visualização e Download do Relatório")
+    ##st.markdown("### 📄 Pré-visualização e Download do Relatório")
     
-    filename_pdf = f"Relatorio_CTR_{str(nro_contrato).replace('/', '-')}.pdf"
+    ##filename_pdf = f"Relatorio_CTR_{str(nro_contrato).replace('/', '-')}.pdf"
     
-    st.download_button(label="Baixar Relatório em PDF", data=pdf_bytes, file_name=filename_pdf, mime="application/pdf")
+    ##st.download_button(label="Baixar Relatório em PDF", data=pdf_bytes, file_name=filename_pdf, mime="application/pdf")
