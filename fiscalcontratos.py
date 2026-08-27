@@ -75,14 +75,12 @@ def obter_contratos_a_vencer(df_p1, df_p5, dias=60):
                 "Dias Restantes": (data_fim - hoje).days
             })
 
-    # 2. Checagem na Planilha5 (Buscando por Execução ou Vigência)
+    # 2. Checagem na Planilha5
     if df_p5 is not None and not df_p5.empty:
-        # Padroniza os nomes das colunas para busca
         colunas_p5 = [str(c).lower().strip() for c in df_p5.columns]
         df_p5_temp = df_p5.copy()
         df_p5_temp.columns = colunas_p5
 
-        # Identifica colunas alvo na Planilha5
         col_contrato = next((c for c in colunas_p5 if 'contrato' in c), None)
         cols_prazos = [c for c in colunas_p5 if any(p in c for p in ['execucao', 'execução', 'vigencia', 'vigência', 'fim'])]
 
@@ -92,7 +90,6 @@ def obter_contratos_a_vencer(df_p1, df_p5, dias=60):
                 if pd.isna(nro_ctr):
                     continue
                 
-                # Busca o nome da empresa correspondente na Planilha1
                 empresa_nome = "-"
                 match_p1 = df_p1[df_p1['contrato'] == nro_ctr]
                 if not match_p1.empty:
@@ -103,7 +100,6 @@ def obter_contratos_a_vencer(df_p1, df_p5, dias=60):
                     if dt_prazo and hoje <= dt_prazo <= limite:
                         label_tipo = f"{col_p.replace('_', ' ').title()} (Planilha5)"
                         
-                        # Evita duplicidade exata de contrato + mesmo tipo
                         if not any(c['Contrato'] == nro_ctr and c['Tipo de Prazo'] == label_tipo for c in contratos_vencendo):
                             contratos_vencendo.append({
                                 "Contrato": nro_ctr,
@@ -115,10 +111,55 @@ def obter_contratos_a_vencer(df_p1, df_p5, dias=60):
             
     df_resultado = pd.DataFrame(contratos_vencendo)
     if not df_resultado.empty:
-        # Remove duplicatas gerais se existirem registros idênticos
         df_resultado = df_resultado.drop_duplicates(subset=["Contrato", "Tipo de Prazo", "Vencimento"])
     
     return df_resultado
+
+def obter_equipe_fiscal(df_p4, nro_contrato):
+    """
+    Busca os fiscais suplentes e fiscais de obras/serviços na Planilha4 correspondentes ao contrato.
+    """
+    if df_p4 is None or df_p4.empty:
+        return {"suplentes": [], "obras_servicos": []}
+    
+    # Padroniza nomes das colunas
+    df_temp = df_p4.copy()
+    df_temp.columns = [str(c).lower().strip() for c in df_temp.columns]
+    
+    col_ctr = next((c for c in df_temp.columns if 'contrato' in c), None)
+    if not col_ctr:
+        return {"suplentes": [], "obras_servicos": []}
+    
+    # Filtra os registros do contrato selecionado
+    registros = df_temp[df_temp[col_ctr].astype(str).str.strip() == str(nro_contrato).strip()]
+    
+    suplentes = []
+    obras_servicos = []
+    
+    # Identifica colunas de cargos/nomes
+    for col in df_temp.columns:
+        if 'suplente' in col:
+            nomes = registros[col].dropna().astype(str).str.strip().tolist()
+            suplentes.extend([n for n in nomes if n and n.lower() != 'nan'])
+        elif any(term in col for term in ['obra', 'servico', 'serviço', 'tecnico', me := 'técnico']):
+            nomes = registros[col].dropna().astype(str).str.strip().tolist()
+            obras_servicos.extend([n for n in nomes if n and n.lower() != 'nan'])
+            
+    # Caso as colunas tenham nomes genéricos como "cargo" e "nome"
+    if 'cargo' in df_temp.columns and 'nome' in df_temp.columns:
+        for idx, row in registros.iterrows():
+            cargo = str(row.get('cargo', '')).lower()
+            nome = str(row.get('nome', '')).strip()
+            if nome and nome.lower() != 'nan':
+                if 'suplente' in cargo:
+                    suplentes.append(nome)
+                elif any(term in cargo for term in ['obra', 'servico', 'serviço', 'tecnico', 'técnico']):
+                    obras_servicos.append(nome)
+                    
+    return {
+        "suplentes": list(set(suplentes)),
+        "obras_servicos": list(set(obras_servicos))
+    }
 
 # -----------------------------------------------------------------------------
 # Classe PDF com Layout Modernizado, Profissional e Suporte a Logotipo
@@ -227,16 +268,20 @@ def carregar_dados():
     df_contratos = conn.read(worksheet="Planilha1")
     df_relatorio = conn.read(worksheet="Planilha2")
     
-    # Carrega a Planilha5 se disponível
+    try:
+        df_planilha4 = conn.read(worksheet="Planilha4")
+    except Exception:
+        df_planilha4 = pd.DataFrame()
+
     try:
         df_planilha5 = conn.read(worksheet="Planilha5")
     except Exception:
         df_planilha5 = pd.DataFrame()
         
-    return df_contratos, df_relatorio, df_planilha5
+    return df_contratos, df_relatorio, df_planilha4, df_planilha5
 
 try:
-    df_contratos, df_relatorio, df_planilha5 = carregar_dados()
+    df_contratos, df_relatorio, df_planilha4, df_planilha5 = carregar_dados()
 except Exception as e:
     st.error(f"Erro ao conectar ao Google Sheets: {e}")
     st.stop()
@@ -246,7 +291,7 @@ except Exception as e:
 # -----------------------------------------------------------------------------
 st.title("📋 Relatório Mensal de Acompanhamento de Contratos")
 
-# --- ALERTA DE VENCIMENTOS COMBINADO (Planilha1 e Planilha5) NA SIDEBAR ---
+# --- ALERTA DE VENCIMENTOS NA SIDEBAR ---
 df_vencendo = obter_contratos_a_vencer(df_contratos, df_planilha5, dias=60)
 qtd_vencendo = len(df_vencendo)
 
@@ -278,6 +323,9 @@ historico = df_relatorio[df_relatorio['CONTRATO'] == nro_contrato]
 ultimo_registro = historico.tail(1) if not historico.empty else None
 st.sidebar.dataframe(historico)
 
+# Busca dados da equipe fiscal na Planilha4
+equipe_fiscal = obter_equipe_fiscal(df_planilha4, nro_contrato)
+
 # Formulário de Edição
 with st.form("form_relatorio"):
     st.subheader(f"Edição do Relatório - Contrato: {nro_contrato}")
@@ -287,8 +335,24 @@ with st.form("form_relatorio"):
         st.write(f"**Empresa:** {dados_ctr['empresa']}")
         st.write(f"**Valor:** R$ {formatar_moeda_br(dados_ctr['valor'])}")
     with col2:
-        st.write(f"**Fiscal:** {dados_ctr['fiscal']}")
+        st.write(f"**Fiscal Titular:** {dados_ctr['fiscal']}")
         st.write(f"**Portaria:** {formatar_inteiro(dados_ctr['portaria'])}")
+
+    # --- APRESENTAÇÃO DA EQUIPE FISCAL ADICIONAL (Planilha4) ---
+    col3, col4 = st.columns(2)
+    with col3:
+        if equipe_fiscal['suplentes']:
+            suplentes_str = ", ".join(equipe_fiscal['suplentes'])
+            st.write(f"**Fiscal(is) Suplente(s):** {suplentes_str}")
+        else:
+            st.write("**Fiscal(is) Suplente(s):** Não informado / Nenhum")
+            
+    with col4:
+        if equipe_fiscal['obras_servicos']:
+            obras_str = ", ".join(equipe_fiscal['obras_servicos'])
+            st.write(f"**Fiscal(is) de Obras/Serviços:** {obras_str}")
+        else:
+            st.write("**Fiscal(is) de Obras/Serviços:** Não informado / Nenhum")
 
     st.markdown("---")
     
