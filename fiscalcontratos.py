@@ -136,12 +136,12 @@ def obter_equipe_fiscal(df_p4, nro_contrato):
     suplentes = []
     obras_servicos = []
     
-    # Identifica colunas de cargos/nomes
+    # Identifica colunas de cargos/nomes (CORRIGIDO SEM O WALRUS OPERATOR INLINE)
     for col in df_temp.columns:
         if 'suplente' in col:
             nomes = registros[col].dropna().astype(str).str.strip().tolist()
             suplentes.extend([n for n in nomes if n and n.lower() != 'nan'])
-        elif any(term in col for term in ['obra', 'servico', 'serviço', 'tecnico', me := 'técnico']):
+        elif any(term in col for term in ['obra', 'servico', 'serviço', 'tecnico', 'técnico']):
             nomes = registros[col].dropna().astype(str).str.strip().tolist()
             obras_servicos.extend([n for n in nomes if n and n.lower() != 'nan'])
             
