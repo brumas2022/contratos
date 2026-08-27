@@ -117,10 +117,10 @@ def obter_contratos_a_vencer(df_p1, df_p5, dias=60):
 
 def obter_equipe_fiscal(df_p4, nro_contrato):
     """
-    Busca os fiscais suplentes e fiscais de obras/serviços na Planilha4 correspondentes ao contrato.
+    Busca os fiscais substitutos e fiscais de obras/serviços na Planilha4 correspondentes ao contrato.
     """
     if df_p4 is None or df_p4.empty:
-        return {"suplentes": [], "obras_servicos": []}
+        return {"substitutos": [], "obras_servicos": []}
     
     # Padroniza nomes das colunas
     df_temp = df_p4.copy()
@@ -128,36 +128,36 @@ def obter_equipe_fiscal(df_p4, nro_contrato):
     
     col_ctr = next((c for c in df_temp.columns if 'contrato' in c), None)
     if not col_ctr:
-        return {"suplentes": [], "obras_servicos": []}
+        return {"substitutos": [], "obras_servicos": []}
     
     # Filtra os registros do contrato selecionado
     registros = df_temp[df_temp[col_ctr].astype(str).str.strip() == str(nro_contrato).strip()]
     
-    suplentes = []
+    substitutos = []
     obras_servicos = []
     
-    # Identifica colunas de cargos/nomes (CORRIGIDO SEM O WALRUS OPERATOR INLINE)
+    # Identifica colunas por cabeçalho
     for col in df_temp.columns:
-        if 'suplente' in col:
+        if any(term in col for term in ['substituto', 'substituta', 'suplente']):
             nomes = registros[col].dropna().astype(str).str.strip().tolist()
-            suplentes.extend([n for n in nomes if n and n.lower() != 'nan'])
+            substitutos.extend([n for n in nomes if n and n.lower() != 'nan'])
         elif any(term in col for term in ['obra', 'servico', 'serviço', 'tecnico', 'técnico']):
             nomes = registros[col].dropna().astype(str).str.strip().tolist()
             obras_servicos.extend([n for n in nomes if n and n.lower() != 'nan'])
             
-    # Caso as colunas tenham nomes genéricos como "cargo" e "nome"
+    # Caso a estrutura da planilha seja por linhas em vez de colunas (com colunas "cargo" e "nome")
     if 'cargo' in df_temp.columns and 'nome' in df_temp.columns:
         for idx, row in registros.iterrows():
             cargo = str(row.get('cargo', '')).lower()
             nome = str(row.get('nome', '')).strip()
             if nome and nome.lower() != 'nan':
-                if 'suplente' in cargo:
-                    suplentes.append(nome)
+                if any(term in cargo for term in ['substituto', 'substituta', 'suplente']):
+                    substitutos.append(nome)
                 elif any(term in cargo for term in ['obra', 'servico', 'serviço', 'tecnico', 'técnico']):
                     obras_servicos.append(nome)
                     
     return {
-        "suplentes": list(set(suplentes)),
+        "substitutos": list(set(substitutos)),
         "obras_servicos": list(set(obras_servicos))
     }
 
@@ -341,11 +341,11 @@ with st.form("form_relatorio"):
     # --- APRESENTAÇÃO DA EQUIPE FISCAL ADICIONAL (Planilha4) ---
     col3, col4 = st.columns(2)
     with col3:
-        if equipe_fiscal['suplentes']:
-            suplentes_str = ", ".join(equipe_fiscal['suplentes'])
-            st.write(f"**Fiscal(is) Suplente(s):** {suplentes_str}")
+        if equipe_fiscal['substitutos']:
+            substitutos_str = ", ".join(equipe_fiscal['substitutos'])
+            st.write(f"**Fiscal(is) Substituto(s):** {substitutos_str}")
         else:
-            st.write("**Fiscal(is) Suplente(s):** Não informado / Nenhum")
+            st.write("**Fiscal(is) Substituto(s):** Não informado / Nenhum")
             
     with col4:
         if equipe_fiscal['obras_servicos']:
