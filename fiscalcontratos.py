@@ -117,48 +117,50 @@ def obter_contratos_a_vencer(df_p1, df_p5, dias=60):
 
 def obter_equipe_fiscal(df_p4, nro_contrato):
     """
-    Busca os fiscais substitutos e fiscais de obras/serviços na Planilha4 correspondentes ao contrato.
+    Busca os fiscais específicos na Planilha4 correspondentes ao contrato selecionado.
     """
     if df_p4 is None or df_p4.empty:
-        return {"substitutos": [], "obras_servicos": []}
+        return {
+            "fiscal_substituto": [],
+            "obras_titular": [],
+            "obras_substituto": []
+        }
     
-    # Padroniza nomes das colunas
+    # Mapeamento flexível de colunas
     df_temp = df_p4.copy()
-    df_temp.columns = [str(c).lower().strip() for c in df_temp.columns]
+    colunas_originais = list(df_temp.columns)
     
-    col_ctr = next((c for c in df_temp.columns if 'contrato' in c), None)
+    # Procura a coluna referente ao contrato
+    col_ctr = next((c for c in colunas_originais if 'contrato' in str(c).lower()), None)
     if not col_ctr:
-        return {"substitutos": [], "obras_servicos": []}
+        return {
+            "fiscal_substituto": [],
+            "obras_titular": [],
+            "obras_substituto": []
+        }
     
     # Filtra os registros do contrato selecionado
     registros = df_temp[df_temp[col_ctr].astype(str).str.strip() == str(nro_contrato).strip()]
     
-    substitutos = []
-    obras_servicos = []
-    
-    # Identifica colunas por cabeçalho
-    for col in df_temp.columns:
-        if any(term in col for term in ['substituto', 'substituta', 'suplente']):
-            nomes = registros[col].dropna().astype(str).str.strip().tolist()
-            substitutos.extend([n for n in nomes if n and n.lower() != 'nan'])
-        elif any(term in col for term in ['obra', 'servico', 'serviço', 'tecnico', 'técnico']):
-            nomes = registros[col].dropna().astype(str).str.strip().tolist()
-            obras_servicos.extend([n for n in nomes if n and n.lower() != 'nan'])
-            
-    # Caso a estrutura da planilha seja por linhas em vez de colunas (com colunas "cargo" e "nome")
-    if 'cargo' in df_temp.columns and 'nome' in df_temp.columns:
-        for idx, row in registros.iterrows():
-            cargo = str(row.get('cargo', '')).lower()
-            nome = str(row.get('nome', '')).strip()
-            if nome and nome.lower() != 'nan':
-                if any(term in cargo for term in ['substituto', 'substituta', 'suplente']):
-                    substitutos.append(nome)
-                elif any(term in cargo for term in ['obra', 'servico', 'serviço', 'tecnico', 'técnico']):
-                    obras_servicos.append(nome)
-                    
+    def extrair_valores_coluna(termos_busca):
+        """Busca em qualquer coluna que contenha os termos especificados"""
+        valores = []
+        for col in colunas_originais:
+            col_lower = str(col).lower().strip()
+            if all(t.lower() in col_lower for t in termos_busca):
+                nomes = registros[col].dropna().astype(str).str.strip().tolist()
+                valores.extend([n for n in nomes if n and n.lower() != 'nan'])
+        return list(set(valores))
+
+    # Busca específica pelas colunas da Planilha4
+    fiscal_substituto = extrair_valores_coluna(["substituto"])
+    obras_titular = extrair_valores_coluna(["obra", "titular"])
+    obras_substituto = extrair_valores_coluna(["obra", "substituto"])
+
     return {
-        "substitutos": list(set(substitutos)),
-        "obras_servicos": list(set(obras_servicos))
+        "fiscal_substituto": fiscal_substituto,
+        "obras_titular": obras_titular,
+        "obras_substituto": obras_substituto
     }
 
 # -----------------------------------------------------------------------------
@@ -335,24 +337,26 @@ with st.form("form_relatorio"):
         st.write(f"**Empresa:** {dados_ctr['empresa']}")
         st.write(f"**Valor:** R$ {formatar_moeda_br(dados_ctr['valor'])}")
     with col2:
-        st.write(f"**Fiscal Titular:** {dados_ctr['fiscal']}")
+        st.write(f"**Fiscal Titular do Contrato:** {dados_ctr['fiscal']}")
         st.write(f"**Portaria:** {formatar_inteiro(dados_ctr['portaria'])}")
 
-    # --- APRESENTAÇÃO DA EQUIPE FISCAL ADICIONAL (Planilha4) ---
-    col3, col4 = st.columns(2)
+    st.markdown("---")
+    st.markdown("**👥 Demais Fiscais Designados (Planilha4):**")
+    
+    # --- APRESENTAÇÃO DETALHADA DA EQUIPE FISCAL (Planilha4) ---
+    col3, col4, col5 = st.columns(3)
+    
     with col3:
-        if equipe_fiscal['substitutos']:
-            substitutos_str = ", ".join(equipe_fiscal['substitutos'])
-            st.write(f"**Fiscal(is) Substituto(s):** {substitutos_str}")
-        else:
-            st.write("**Fiscal(is) Substituto(s):** Não informado / Nenhum")
+        txt_sub = ", ".join(equipe_fiscal['fiscal_substituto']) if equipe_fiscal['fiscal_substituto'] else "Não informado"
+        st.write(f"**Fiscal de Contrato Substituto:** {txt_sub}")
             
     with col4:
-        if equipe_fiscal['obras_servicos']:
-            obras_str = ", ".join(equipe_fiscal['obras_servicos'])
-            st.write(f"**Fiscal(is) de Obras/Serviços:** {obras_str}")
-        else:
-            st.write("**Fiscal(is) de Obras/Serviços:** Não informado / Nenhum")
+        txt_obras_tit = ", ".join(equipe_fiscal['obras_titular']) if equipe_fiscal['obras_titular'] else "Não informado"
+        st.write(f"**Fiscal de Obras/Serviço Titular:** {txt_obras_tit}")
+
+    with col5:
+        txt_obras_sub = ", ".join(equipe_fiscal['obras_substituto']) if equipe_fiscal['obras_substituto'] else "Não informado"
+        st.write(f"**Fiscal de Obras/Serviço Substituto:** {txt_obras_sub}")
 
     st.markdown("---")
     
