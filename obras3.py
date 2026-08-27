@@ -8,6 +8,21 @@ import datetime
 st.set_page_config(page_title="Consulta Contratos de Obra", layout="wide")
 
 # -----------------------------------------------------------------------------
+# Estilização CSS Customizada (Fundo Verde Claro)
+# -----------------------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    /* Cor de fundo da área principal da aplicação */
+    .stApp {
+        background-color: #E8F5E9; /* Verde claro suave (pode usar #F0F9F0 para ainda mais claro) */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -----------------------------------------------------------------------------
 # Leitura e Cache de Dados
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=300)
@@ -199,5 +214,3 @@ else:
         
     with aba_grafico:
         exibir_graficos(nro_contrato)
-
-#vencimentos()
