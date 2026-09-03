@@ -20,12 +20,24 @@ st.set_page_config(
 def formatar_moeda_br(valor):
     """Converte valores numéricos para o padrão de moeda brasileiro (ex: 1.234.567,89)"""
     try:
-        if isinstance(valor, str):
-            valor = valor.replace("R$", "").replace(".", "").replace(",", ".").strip()
-        val_float = float(valor)
+        # Se já for número (float ou int), converte direto sem manipular strings
+        if isinstance(valor, (int, float)):
+            val_float = float(valor)
+        else:
+            v_str = str(valor).replace("R$", "").strip()
+            # Tratamento para strings que vêm no formato BR (ex: "1.234,56")
+            if "," in v_str:
+                v_str = v_str.replace(".", "").replace(",", ".")
+            val_float = float(v_str)
+            
         return f"{val_float:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except (ValueError, TypeError):
         return str(valor)
+
+def formatar_data_br(valor):
+    """Garante a formatação da data no padrão dd/mm/aaaa"""
+    dt = converter_para_data(valor)
+    return dt.strftime("%d/%m/%Y") if dt else str(valor)
 
 def formatar_inteiro(valor):
     """Garante que o valor seja exibido como número inteiro, sem casas decimais"""
@@ -210,17 +222,21 @@ def gerar_pdf_bytes(dados):
     pdf = RelatorioPDF("P", "mm", "A4")
     pdf.add_page()
     
+    # Trata/Formata todas as datas para dd/mm/aaaa
+    dt_inicio = formatar_data_br(dados['data_inicio'])
+    dt_fim = formatar_data_br(dados['data_fim'])
+    dt_portaria = formatar_data_br(dados['portaria_data'])
+    
     # 1. Informações Básicas
     pdf.secao_titulo("1. IDENTIFICAÇÃO DO CONTRATO E CONTRATADA")
     pdf.set_font("Arial", "", 8.5)
     pdf.cell(93, 6, f" Contrato Nº: {dados['contrato']}", border="L")
-    pdf.cell(93, 6, f" Data de Início: {dados['data_inicio']}", border="R", ln=True)
+    pdf.cell(93, 6, f" Data de Início: {dt_inicio}", border="R", ln=True)
     pdf.cell(186, 6, f" Contratado(a): {dados['empresa']}", border="LR", ln=True)
     
-    pdf.set_font("Arial", "B", 8.5)
-    pdf.cell(186, 5, " Objeto:", border="LR", ln=True)
+    # Campo Objeto ajustado para ficar logo à frente do ":"
     pdf.set_font("Arial", "", 8.5)
-    pdf.multi_cell(186, 5, f" {dados['objeto']}", border="LRB")
+    pdf.multi_cell(186, 5, f" Objeto: {dados['objeto']}", border="LRB")
     pdf.ln(2.5)
 
     # 2. Prazos e Valores
@@ -230,7 +246,7 @@ def gerar_pdf_bytes(dados):
     valor_formatado = formatar_moeda_br(dados['valor'])
     prazo_formatado = formatar_inteiro(dados['prazo'])
     
-    pdf.cell(93, 6, f" Data Conclusão: {dados['data_fim']}", border="L")
+    pdf.cell(93, 6, f" Data Conclusão: {dt_fim}", border="L")
     pdf.cell(93, 6, f" Valor do Contrato: R$ {valor_formatado}", border="R", ln=True)
     pdf.cell(93, 6, f" Prazo: {prazo_formatado} dias", border="L")
     pdf.cell(93, 6, f" Licitação: {dados['licitacao']}", border="R", ln=True)
@@ -243,17 +259,19 @@ def gerar_pdf_bytes(dados):
     pdf.campo_texto("5. AVALIAÇÃO DOS SERVIÇOS E DOCUMENTOS", dados['avaliacao'])
     pdf.campo_texto("6. OBSERVAÇÕES / SUGESTÕES / RECLAMAÇÕES", dados['obs'])
 
-    # 4. Assinatura e Dados do Fiscal
+    # 4. Assinatura e Dados do Fiscal (Ajustado para gov.br)
     pdf.ln(2)
     pdf.secao_titulo("7. IDENTIFICAÇÃO DO FISCAL E ASSINATURA")
     pdf.set_font("Arial", "", 8.5)
     
     portaria_formatada = formatar_inteiro(dados['portaria_nro'])
     
-    pdf.cell(106, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="L")
-    pdf.cell(80, 6, " ASSINATURA", border="R", ln=True, align="C")
-    pdf.cell(106, 12, f" Portaria Nº: {portaria_formatada} | Data: {dados['portaria_data']}", border="LB")
-    pdf.cell(80, 12, "", border="RB", ln=True)
+    # Campo para assinatura gov.br com espaço dedicado de 22mm de altura
+    pdf.cell(106, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="TL")
+    pdf.cell(80, 6, " ESPAÇO PARA ASSINATURA GOV.BR", border="TR", ln=True, align="C")
+    
+    pdf.cell(106, 16, f" Portaria Nº: {portaria_formatada} | Data: {dt_portaria}", border="LB")
+    pdf.cell(80, 16, "", border="RB", ln=True) # Área limpa para o carimbo digital
     
     pdf.set_font("Arial", "I", 8)
     pdf.cell(186, 6, f" Relatório Referente a: {dados['data_relatorio']}", border="LRB", ln=True, align="R")
@@ -418,3 +436,5 @@ if btn_salvar:
     st.markdown("### 📄 Pré-visualização e Download do Relatório")
     filename_pdf = f"Relatorio_CTR_{str(nro_contrato).replace('/', '-')}.pdf"
     st.download_button(label="Baixar Relatório em PDF", data=pdf_bytes, file_name=filename_pdf, mime="application/pdf")
+
+
