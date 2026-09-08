@@ -271,8 +271,8 @@ def gerar_pdf_bytes(dados):
     pdf.cell(106, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="TL")
     pdf.cell(80, 6, "ASSINATURA", border="TR", ln=True, align="C")
     
-    pdf.cell(106, 16, f" Portaria Nº: {portaria_formatada} | Data: {dt_portaria}", border="LB")
-    pdf.cell(80, 30, "", border="RB", ln=True) # Área limpa para o carimbo digital
+    pdf.cell(106, 20, f" Portaria Nº: {portaria_formatada} | Data: {dt_portaria}", border="LB")
+    pdf.cell(80, 20, "", border="RB", ln=True) # Área limpa para o carimbo digital
     
     pdf.set_font("Arial", "I", 8)
     pdf.cell(186, 6, f" Relatório Referente a: {dados['data_relatorio']}", border="LRB", ln=True, align="R")
