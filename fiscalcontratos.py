@@ -223,7 +223,8 @@ def gerar_pdf_bytes(dados):
     pdf.add_page()
     
     # Trata/Formata todas as datas para dd/mm/aaaa
-    dt_inicio = formatar_data_br(dados['data_inicio'])
+    ##dt_inicio = formatar_data_br(dados['data_inicio'])
+    dt_inicio = dados['data_inicio']
     dt_fim = formatar_data_br(dados['data_fim'])
     dt_portaria = formatar_data_br(dados['portaria_data'])
     
@@ -268,7 +269,7 @@ def gerar_pdf_bytes(dados):
     
     # Campo para assinatura gov.br com espaço dedicado de 22mm de altura
     pdf.cell(106, 6, f" Fiscal de Contrato: {dados['fiscal_nome']}", border="TL")
-    pdf.cell(80, 6, " ESPAÇO PARA ASSINATURA GOV.BR", border="TR", ln=True, align="C")
+    pdf.cell(80, 6, "ASSINATURA", border="TR", ln=True, align="C")
     
     pdf.cell(106, 16, f" Portaria Nº: {portaria_formatada} | Data: {dt_portaria}", border="LB")
     pdf.cell(80, 16, "", border="RB", ln=True) # Área limpa para o carimbo digital
