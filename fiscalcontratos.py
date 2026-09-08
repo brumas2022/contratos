@@ -224,7 +224,7 @@ def gerar_pdf_bytes(dados):
     
     # Trata/Formata todas as datas para dd/mm/aaaa
     ##dt_inicio = formatar_data_br(dados['data_inicio'])
-    dt_inicio = dados['data_inicio']
+    dt_inicio = dados['data_inicio'].strftime("%d/%m/%Y")
     dt_fim = formatar_data_br(dados['data_fim'])
     dt_portaria = formatar_data_br(dados['portaria_data'])
     
