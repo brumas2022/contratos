@@ -9,7 +9,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Consulta Contratos de Obra", layout="wide")
 
 # -----------------------------------------------------------------------------
-# Estilização CSS Customizada (Fundo Verde Claro)
+# Estilização CSS Customizada
 # -----------------------------------------------------------------------------
 st.markdown(
     """
@@ -27,9 +27,14 @@ st.markdown(
 # -----------------------------------------------------------------------------
 @st.cache_resource
 def init_supabase() -> Client:
-    # Recomenda-se configurar no st.secrets do Streamlit
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    # Busca credenciais com fallback preventivo
+    url = st.secrets.get("SUPABASE_URL")
+    key = st.secrets.get("SUPABASE_KEY")
+    
+    if not url or not key:
+        st.error("⚠️ Configuração ausente: Verifique se 'SUPABASE_URL' e 'SUPABASE_KEY' estão definidas no secrets.toml.")
+        st.stop()
+        
     return create_client(url, key)
 
 @st.cache_data(ttl=300)
@@ -48,19 +53,15 @@ def carregar_medicoes_supabase():
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=300)
 def carregar_google_sheets():
-    """
-    Carrega as planilhas 'Planilha1' (Contratos) e 'Planilha5' (Aditivos)
-    da pasta/arquivo 'Dados' no Google Sheets.
+    SHEET_ID = "1ANxy7fkVPYlldx7_N3Ywm8J8J5aBIX5mKFBpy4E_h_Y"
     
-    Substitua o SHEET_ID_DADOS pelo ID real do seu arquivo do Google Sheets.
-    """
-    ##SHEET_ID_DADOS = st.secrets[GSHEET_ID_DADOS]
+    # GIDs obtidos do seu código original
+    GID_PLANILHA1 = "1888864733"
+    GID_PLANILHA5 = "228487117"
     
-    # URLs para exportação direta em CSV via GSheets
-    url_planilha1=f"https://docs.google.com/spreadsheets/d/1ANxy7fkVPYlldx7_N3Ywm8J8J5aBIX5mKFBpy4E_h_Y/edit?gid=1888864733#gid=1888864733"
-    url_planilha5=f"https://docs.google.com/spreadsheets/d/1ANxy7fkVPYlldx7_N3Ywm8J8J5aBIX5mKFBpy4E_h_Y/edit?gid=228487117#gid=228487117"
-    ##url_planilha1 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_DADOS}/gviz/tq?tqx=out:csv&sheet=Planilha1"
-    ##url_planilha5 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_DADOS}/gviz/tq?tqx=out:csv&sheet=Planilha5"
+    # Formatação das URLs exportando os dados limpos em CSV via endpoint gviz/tq
+    url_planilha1 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&gid={GID_PLANILHA1}"
+    url_planilha5 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&gid={GID_PLANILHA5}"
 
     try:
         df_contratos = pd.read_csv(url_planilha1)
@@ -81,7 +82,6 @@ except Exception as e:
 # -----------------------------------------------------------------------------
 # Mapeamento e Dinamização de Contratos
 # -----------------------------------------------------------------------------
-# Gerando a lista de seleção dinamicamente a partir da coluna 'contrato' da Planilha1
 if not df_contratos.empty and "contrato" in df_contratos.columns:
     LISTA_CONTRATOS = df_contratos["contrato"].dropna().unique().tolist()
 else:
@@ -93,7 +93,6 @@ else:
 def exibir_vencimentos():
     st.subheader("🗓️ Contratos a Vencer")
     try:
-        # Se a planilha de vencimentos também estiver no GSheets, substitua este trecho
         contratos_vencer = pd.read_excel("abril-2026.xlsx", sheet_name=0)
         st.dataframe(contratos_vencer, use_container_width=True)
     except Exception as e:
@@ -107,7 +106,6 @@ def exibir_dados_gerais(nro_contrato):
         
     linha = df_filtrado.iloc[0]
     
-    # Formatação de valor
     valor_bruto = linha.get("valor", 0)
     try:
         valor_bruto = float(valor_bruto)
@@ -116,7 +114,6 @@ def exibir_dados_gerais(nro_contrato):
 
     valor_fmt = f"R$ {valor_bruto:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     
-    # Formatação das datas
     dt_inicio = pd.to_datetime(linha.get("inicio"), errors='coerce').strftime("%d/%m/%Y") if pd.notna(linha.get("inicio")) else "-"
     dt_fim = pd.to_datetime(linha.get("fim"), errors='coerce').strftime("%d/%m/%Y") if pd.notna(linha.get("fim")) else "-"
 
@@ -167,11 +164,9 @@ def exibir_medicoes(nro_contrato):
 
     df_selecao = df_medicao[df_medicao["CONTRATO"] == nro_contrato].copy()
     
-    # Obter valor original do contrato
     df_c = df_contratos[df_contratos["contrato"] == nro_contrato]
     valor_contrato_orig = float(df_c.iloc[0].get("valor", 0)) if not df_c.empty else 0.0
     
-    # Soma de aditivos de valor
     valor_aditivos = 0.0
     if not df_aditivo.empty and "CONTRATO" in df_aditivo.columns:
         df_ad_filtrado = df_aditivo[
