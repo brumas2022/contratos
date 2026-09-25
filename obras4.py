@@ -28,9 +28,10 @@ st.markdown(
 @st.cache_resource
 def init_supabase() -> Client:
     # Busca credenciais com fallback preventivo
-    url = st.secrets.get("SUPABASE_URL")
-    key = st.secrets.get("SUPABASE_KEY")
-    
+    ##url = st.secrets.get("SUPABASE_URL")
+    ##key = st.secrets.get("SUPABASE_KEY")
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
     if not url or not key:
         st.error("⚠️ Configuração ausente: Verifique se 'SUPABASE_URL' e 'SUPABASE_KEY' estão definidas no secrets.toml.")
         st.stop()
