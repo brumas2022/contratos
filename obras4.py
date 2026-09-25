@@ -54,7 +54,7 @@ def carregar_google_sheets():
     
     Substitua o SHEET_ID_DADOS pelo ID real do seu arquivo do Google Sheets.
     """
-    SHEET_ID_DADOS = st.secrets[GSHEET_ID_DADOS]
+    ##SHEET_ID_DADOS = st.secrets[GSHEET_ID_DADOS]
     
     # URLs para exportação direta em CSV via GSheets
     url_planilha1=f"https://docs.google.com/spreadsheets/d/1ANxy7fkVPYlldx7_N3Ywm8J8J5aBIX5mKFBpy4E_h_Y/edit?gid=1888864733#gid=1888864733"
