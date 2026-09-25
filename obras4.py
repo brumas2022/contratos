@@ -180,7 +180,7 @@ def exibir_medicoes(nro_contrato):
     valor_total_contrato = valor_contrato_orig + valor_aditivos
     
     if not df_selecao.empty:
-        df_selecao["VALOR"] = pd.to_numeric(df_selecao["VALOR"], errors='coerce').fillna(0)
+        df_selecao["VALOR"] = pd.to_numeric(df_selecao["valor"], errors='coerce').fillna(0)
         df_selecao["% ACUMULADO"] = df_selecao["VALOR"].cumsum()
         df_selecao["% EXECUTADO DO CONTRATO"] = (df_selecao["% ACUMULADO"] / valor_total_contrato * 100) if valor_total_contrato > 0 else 0
         
