@@ -58,8 +58,9 @@ def carregar_google_sheets():
     
     # URLs para exportação direta em CSV via GSheets
     url_planilha1=f"https://docs.google.com/spreadsheets/d/1ANxy7fkVPYlldx7_N3Ywm8J8J5aBIX5mKFBpy4E_h_Y/edit?gid=1888864733#gid=1888864733"
+    url_planilha5=f"https://docs.google.com/spreadsheets/d/1ANxy7fkVPYlldx7_N3Ywm8J8J5aBIX5mKFBpy4E_h_Y/edit?gid=228487117#gid=228487117"
     ##url_planilha1 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_DADOS}/gviz/tq?tqx=out:csv&sheet=Planilha1"
-    url_planilha5 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_DADOS}/gviz/tq?tqx=out:csv&sheet=Planilha5"
+    ##url_planilha5 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_DADOS}/gviz/tq?tqx=out:csv&sheet=Planilha5"
 
     try:
         df_contratos = pd.read_csv(url_planilha1)
