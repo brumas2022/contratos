@@ -28,8 +28,8 @@ st.markdown(
 @st.cache_resource
 def init_supabase() -> Client:
     # Recomenda-se configurar no st.secrets do Streamlit
-    url = st.secrets.get("SUPABASE_URL", "https://brumas222.supabase.co")
-    key = st.secrets.get("SUPABASE_KEY", "SUA_SUPABASE_KEY_AQUI")
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 
 @st.cache_data(ttl=300)
