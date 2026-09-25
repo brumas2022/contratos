@@ -3,3 +3,6 @@ pandas
 fpdf2
 st-gsheets-connection
 openpyxl
+supabase
+gspread 
+google-auth
