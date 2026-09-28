@@ -160,7 +160,7 @@ def exibir_medicoes(nro_contrato):
     st.subheader("📏 Medições Realizadas")
     df_medicao
     
-    if df_medicao.empty or "CONTRATO" not in df_medicao.columns:
+    if df_medicao.empty or "contrato" not in df_medicao.columns:
         st.info("Nenhum dado de medição disponível no Supabase.")
         return
 
