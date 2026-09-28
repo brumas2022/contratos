@@ -158,14 +158,14 @@ def exibir_aditivos(nro_contrato):
 
 def exibir_medicoes(nro_contrato):
     st.subheader("📏 Medições Realizadas")
-    df_medicao
+    ##df_medicao
     
     if df_medicao.empty or "contrato" not in df_medicao.columns:
         st.info("Nenhum dado de medição disponível no Supabase.")
         return
 
     df_selecao = df_medicao[df_medicao["contrato"] == nro_contrato].copy()
-    
+    df_selecao
     df_c = df_contratos[df_contratos["contrato"] == nro_contrato]
     valor_contrato_orig = float(df_c.iloc[0].get("valor", 0)) if not df_c.empty else 0.0
     
