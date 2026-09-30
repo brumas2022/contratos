@@ -158,29 +158,45 @@ def exibir_aditivos(nro_contrato):
 
 def exibir_medicoes(nro_contrato):
     st.subheader("📏 Medições Realizadas")
-    ##df_medicao
     
     if df_medicao.empty or "contrato" not in df_medicao.columns:
         st.info("Nenhum dado de medição disponível no Supabase.")
         return
 
     df_selecao = df_medicao[df_medicao["contrato"] == nro_contrato].copy()
-    df_selecao
-    df_c = df_contratos[df_contratos["contrato"] == nro_contrato]
-    valor_contrato_orig = float(df_c.iloc[0].get("valor", 0)) if not df_c.empty else 0.0
     
+    # Tratamento seguro do valor do contrato original
+    df_c = df_contratos[df_contratos["contrato"] == nro_contrato]
+    valor_contrato_orig = 0.0
+    if not df_c.empty:
+        v_raw = df_c.iloc[0].get("valor", 0)
+        if pd.notna(v_raw):
+            if isinstance(v_raw, str):
+                # Limpa 'R$', espaços e trata formatação brasileira (1.000,00 -> 1000.00)
+                v_raw = v_raw.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
+            valor_contrato_orig = float(pd.to_numeric(v_raw, errors='coerce') or 0.0)
+
+    # Tratamento seguro dos aditivos
     valor_aditivos = 0.0
     if not df_aditivo.empty and "CONTRATO" in df_aditivo.columns:
         df_ad_filtrado = df_aditivo[
             (df_aditivo["CONTRATO"] == nro_contrato) & 
             (df_aditivo["TIPO"] == "ADITIVO DE VALOR")
-        ]
+        ].copy()
+        
         if not df_ad_filtrado.empty:
-            valor_aditivos = pd.to_numeric(df_ad_filtrado["VALOR"], errors='coerce').sum()
+            # Converte valores com tratamento de vírgulas caso venha como texto
+            if df_ad_filtrado["VALOR"].dtype == object:
+                df_ad_filtrado["VALOR"] = df_ad_filtrado["VALOR"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+            valor_aditivos = float(pd.to_numeric(df_ad_filtrado["VALOR"], errors='coerce').sum())
     
     valor_total_contrato = valor_contrato_orig + valor_aditivos
     
     if not df_selecao.empty:
+        # Tratamento de formato de texto para os valores medidos
+        if df_selecao["valor"].dtype == object:
+            df_selecao["valor"] = df_selecao["valor"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+            
         df_selecao["VALOR"] = pd.to_numeric(df_selecao["valor"], errors='coerce').fillna(0)
         df_selecao["% ACUMULADO"] = df_selecao["VALOR"].cumsum()
         df_selecao["% EXECUTADO DO CONTRATO"] = (df_selecao["% ACUMULADO"] / valor_total_contrato * 100) if valor_total_contrato > 0 else 0
@@ -198,7 +214,7 @@ def exibir_medicoes(nro_contrato):
             }
         )
 
-    total_medido = df_selecao["VALOR"].sum() if not df_selecao.empty else 0.0
+    total_medido = float(df_selecao["VALOR"].sum()) if not df_selecao.empty else 0.0
     saldo = valor_total_contrato - total_medido
     porcento = (total_medido / valor_total_contrato * 100) if valor_total_contrato > 0 else 0.0
 
