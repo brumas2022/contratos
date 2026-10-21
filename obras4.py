@@ -23,13 +23,39 @@ st.markdown(
 )
 
 # -----------------------------------------------------------------------------
+# Função Auxiliar para Tratamento Monetário / Numérico
+# -----------------------------------------------------------------------------
+def limpar_valor_monetario(valor) -> float:
+    """
+    Converte com segurança qualquer formato de valor (string com R$, ponto, vírgula, int, float)
+    para o tipo float nativo do Python.
+    """
+    if pd.isna(valor) or valor is None:
+        return 0.0
+    
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    
+    # Se for string, limpa formatações
+    val_str = str(valor).strip()
+    val_str = val_str.replace("R$", "").replace(" ", "")
+    
+    # Trata padrão brasileiro (ex: 1.234.567,89)
+    if "," in val_str and "." in val_str:
+        val_str = val_str.replace(".", "").replace(",", ".")
+    elif "," in val_str:
+        val_str = val_str.replace(",", ".")
+        
+    try:
+        return float(val_str)
+    except (ValueError, TypeError):
+        return 0.0
+
+# -----------------------------------------------------------------------------
 # Conexão e Leitura do Supabase
 # -----------------------------------------------------------------------------
 @st.cache_resource
 def init_supabase() -> Client:
-    # Busca credenciais com fallback preventivo
-    ##url = st.secrets.get("SUPABASE_URL")
-    ##key = st.secrets.get("SUPABASE_KEY")
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
     if not url or not key:
@@ -44,6 +70,13 @@ def carregar_medicoes_supabase():
         supabase = init_supabase()
         response = supabase.table("bdmedicaonova").select("*").execute()
         df = pd.DataFrame(response.data)
+        
+        # Garante conversão da coluna 'valor' para numérico logo após a carga
+        if not df.empty and "valor" in df.columns:
+            df["valor_num"] = df["valor"].apply(limpar_valor_monetario)
+        elif not df.empty:
+            df["valor_num"] = 0.0
+            
         return df
     except Exception as e:
         st.error(f"Erro ao carregar medições do Supabase: {e}")
@@ -56,17 +89,23 @@ def carregar_medicoes_supabase():
 def carregar_google_sheets():
     SHEET_ID = "1ANxy7fkVPYlldx7_N3Ywm8J8J5aBIX5mKFBpy4E_h_Y"
     
-    # GIDs obtidos do seu código original
     GID_PLANILHA1 = "1888864733"
     GID_PLANILHA5 = "228487117"
     
-    # Formatação das URLs exportando os dados limpos em CSV via endpoint gviz/tq
     url_planilha1 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&gid={GID_PLANILHA1}"
     url_planilha5 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&gid={GID_PLANILHA5}"
 
     try:
         df_contratos = pd.read_csv(url_planilha1)
         df_aditivo = pd.read_csv(url_planilha5)
+        
+        # Pré-tratamento das colunas de valor
+        if not df_contratos.empty and "valor" in df_contratos.columns:
+            df_contratos["valor_num"] = df_contratos["valor"].apply(limpar_valor_monetario)
+            
+        if not df_aditivo.empty and "VALOR" in df_aditivo.columns:
+            df_aditivo["VALOR_NUM"] = df_aditivo["VALOR"].apply(limpar_valor_monetario)
+            
         return df_contratos, df_aditivo
     except Exception as e:
         st.error(f"Erro ao carregar dados do Google Sheets: {e}")
@@ -106,13 +145,7 @@ def exibir_dados_gerais(nro_contrato):
         return
         
     linha = df_filtrado.iloc[0]
-    
-    valor_bruto = linha.get("valor", 0)
-    try:
-        valor_bruto = float(valor_bruto)
-    except (ValueError, TypeError):
-        valor_bruto = 0.0
-
+    valor_bruto = linha.get("valor_num", 0.0)
     valor_fmt = f"R$ {valor_bruto:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     
     dt_inicio = pd.to_datetime(linha.get("inicio"), errors='coerce').strftime("%d/%m/%Y") if pd.notna(linha.get("inicio")) else "-"
@@ -142,6 +175,9 @@ def exibir_aditivos(nro_contrato):
         st.info("Nenhum aditivo registrado para este contrato.")
         return
 
+    if "VALOR_NUM" in df_filtrado.columns:
+        df_filtrado["VALOR"] = df_filtrado["VALOR_NUM"]
+
     st.dataframe(
         df_filtrado,
         hide_index=True,
@@ -159,47 +195,43 @@ def exibir_aditivos(nro_contrato):
 def exibir_medicoes(nro_contrato):
     st.subheader("📏 Medições Realizadas")
     
-    if df_medicao.empty or "contrato" not in df_medicao.columns:
+    # Normalização de busca do contrato nas medições (case-insensitive para coluna)
+    col_contrato_med = "contrato" if "contrato" in df_medicao.columns else ("CONTRATO" if "CONTRATO" in df_medicao.columns else None)
+    
+    if df_medicao.empty or col_contrato_med is None:
         st.info("Nenhum dado de medição disponível no Supabase.")
         return
 
-    df_selecao = df_medicao[df_medicao["contrato"] == nro_contrato].copy()
+    df_selecao = df_medicao[df_medicao[col_contrato_med] == nro_contrato].copy()
     
-    # Tratamento seguro do valor do contrato original
+    # Obter Valor do Contrato Original
     df_c = df_contratos[df_contratos["contrato"] == nro_contrato]
-    valor_contrato_orig = 0.0
-    if not df_c.empty:
-        v_raw = df_c.iloc[0].get("valor", 0)
-        if pd.notna(v_raw):
-            if isinstance(v_raw, str):
-                # Limpa 'R$', espaços e trata formatação brasileira (1.000,00 -> 1000.00)
-                v_raw = v_raw.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
-            valor_contrato_orig = float(pd.to_numeric(v_raw, errors='coerce') or 0.0)
+    valor_contrato_orig = float(df_c["valor_num"].iloc[0]) if not df_c.empty and "valor_num" in df_c.columns else 0.0
 
-    # Tratamento seguro dos aditivos
+    # Obter Valor Total dos Aditivos de Valor
     valor_aditivos = 0.0
     if not df_aditivo.empty and "CONTRATO" in df_aditivo.columns:
         df_ad_filtrado = df_aditivo[
             (df_aditivo["CONTRATO"] == nro_contrato) & 
-            (df_aditivo["TIPO"] == "ADITIVO DE VALOR")
-        ].copy()
-        
+            (df_aditivo["TIPO"].astype(str).str.upper() == "ADITIVO DE VALOR")
+        ]
         if not df_ad_filtrado.empty:
-            # Converte valores com tratamento de vírgulas caso venha como texto
-            if df_ad_filtrado["VALOR"].dtype == object:
-                df_ad_filtrado["VALOR"] = df_ad_filtrado["VALOR"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
-            valor_aditivos = float(pd.to_numeric(df_ad_filtrado["VALOR"], errors='coerce').sum())
+            valor_aditivos = float(df_ad_filtrado["VALOR_NUM"].sum())
     
     valor_total_contrato = valor_contrato_orig + valor_aditivos
     
     if not df_selecao.empty:
-        # Tratamento de formato de texto para os valores medidos
-        if df_selecao["valor"].dtype == object:
-            df_selecao["valor"] = df_selecao["valor"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+        # Garante a ordenação caso exista data de medição/id para calcular acumulados na ordem correta
+        if "id" in df_selecao.columns:
+            df_selecao = df_selecao.sort_values(by="id")
             
-        df_selecao["VALOR"] = pd.to_numeric(df_selecao["valor"], errors='coerce').fillna(0)
-        df_selecao["% ACUMULADO"] = df_selecao["VALOR"].cumsum()
-        df_selecao["% EXECUTADO DO CONTRATO"] = (df_selecao["% ACUMULADO"] / valor_total_contrato * 100) if valor_total_contrato > 0 else 0
+        df_selecao["VALOR MEDIDO"] = df_selecao["valor_num"]
+        
+        # Cálculos das Colunas Solicitadas
+        df_selecao["ACUMULADO ANTERIOR"] = df_selecao["VALOR MEDIDO"].cumsum() - df_selecao["VALOR MEDIDO"]
+        df_selecao["ACUMULADO ATUAL"] = df_selecao["VALOR MEDIDO"].cumsum()
+        df_selecao["SALDO RESTANTE"] = valor_total_contrato - df_selecao["ACUMULADO ATUAL"]
+        df_selecao["% EXECUTADO DO CONTRATO"] = (df_selecao["ACUMULADO ATUAL"] / valor_total_contrato * 100) if valor_total_contrato > 0 else 0.0
         
         st.dataframe(
             df_selecao,
@@ -209,35 +241,41 @@ def exibir_medicoes(nro_contrato):
                 "DATA MEDICAO": st.column_config.DatetimeColumn("DATA MEDIÇÃO", format="DD/MM/YYYY"),
                 "DATA NF": st.column_config.DatetimeColumn("DATA NF", format="DD/MM/YYYY"),
                 "DATA PAGTO": st.column_config.DatetimeColumn("DATA PAGTO", format="DD/MM/YYYY"),
-                "VALOR": st.column_config.NumberColumn("VALOR MEDIDO", format="R$ %.2f"),
+                "VALOR MEDIDO": st.column_config.NumberColumn("VALOR MEDIDO", format="R$ %.2f"),
+                "ACUMULADO ANTERIOR": st.column_config.NumberColumn("ACUM. ANTERIOR", format="R$ %.2f"),
+                "ACUMULADO ATUAL": st.column_config.NumberColumn("ACUM. POSTERIOR / ATUAL", format="R$ %.2f"),
+                "SALDO RESTANTE": st.column_config.NumberColumn("SALDO RESTANTE", format="R$ %.2f"),
                 "% EXECUTADO DO CONTRATO": st.column_config.NumberColumn("% CONTRATO", format="%.2f %%")
             }
         )
 
-    total_medido = float(df_selecao["VALOR"].sum()) if not df_selecao.empty else 0.0
+    total_medido = float(df_selecao["VALOR MEDIDO"].sum()) if not df_selecao.empty else 0.0
     saldo = valor_total_contrato - total_medido
     porcento = (total_medido / valor_total_contrato * 100) if valor_total_contrato > 0 else 0.0
 
     st.markdown("---")
     st.markdown("### 📊 Resumo Financeiro")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total Medido", f"R$ {total_medido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-    c2.metric("Percentual Executado", f"{porcento:.2f} %")
-    c3.metric("Saldo do Contrato + Aditivos", f"R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Valor Contrato + Aditivos", f"R$ {valor_total_contrato:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    c2.metric("Total Medido", f"R$ {total_medido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    c3.metric("Percentual Executado", f"{porcento:.2f} %")
+    c4.metric("Saldo + Aditivos", f"R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
 def exibir_graficos(nro_contrato):
     st.subheader("📈 Evolução das Medições")
-    if df_medicao.empty or "CONTRATO" not in df_medicao.columns:
+    col_contrato = "contrato" if "contrato" in df_medicao.columns else ("CONTRATO" if "CONTRATO" in df_medicao.columns else None)
+    
+    if df_medicao.empty or col_contrato is None:
         st.info("Sem dados de medição suficientes para gerar gráficos.")
         return
 
-    df_selecao = df_medicao[df_medicao["CONTRATO"] == nro_contrato]
+    df_selecao = df_medicao[df_medicao[col_contrato] == nro_contrato]
     
-    if df_selecao.empty:
+    if df_selecao.empty or "valor_num" not in df_selecao.columns:
         st.info("Sem dados de medição suficientes para gerar gráficos.")
         return
         
-    valores = pd.to_numeric(df_selecao['VALOR'], errors='coerce').fillna(0).tolist()
+    valores = df_selecao["valor_num"].tolist()
     st.bar_chart(valores, use_container_width=True)
 
 # -----------------------------------------------------------------------------
