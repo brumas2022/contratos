@@ -36,11 +36,9 @@ def limpar_valor_monetario(valor) -> float:
     if isinstance(valor, (int, float)):
         return float(valor)
     
-    # Se for string, limpa formatações
     val_str = str(valor).strip()
     val_str = val_str.replace("R$", "").replace(" ", "")
     
-    # Trata padrão brasileiro (ex: 1.234.567,89)
     if "," in val_str and "." in val_str:
         val_str = val_str.replace(".", "").replace(",", ".")
     elif "," in val_str:
@@ -71,7 +69,6 @@ def carregar_medicoes_supabase():
         response = supabase.table("bdmedicaonova").select("*").execute()
         df = pd.DataFrame(response.data)
         
-        # Garante conversão da coluna 'valor' para numérico logo após a carga
         if not df.empty and "valor" in df.columns:
             df["valor_num"] = df["valor"].apply(limpar_valor_monetario)
         elif not df.empty:
@@ -99,12 +96,23 @@ def carregar_google_sheets():
         df_contratos = pd.read_csv(url_planilha1)
         df_aditivo = pd.read_csv(url_planilha5)
         
-        # Pré-tratamento das colunas de valor
-        if not df_contratos.empty and "valor" in df_contratos.columns:
-            df_contratos["valor_num"] = df_contratos["valor"].apply(limpar_valor_monetario)
-            
-        if not df_aditivo.empty and "VALOR" in df_aditivo.columns:
-            df_aditivo["VALOR_NUM"] = df_aditivo["VALOR"].apply(limpar_valor_monetario)
+        # Padronização de colunas
+        df_contratos.columns = [c.strip().lower() for c in df_contratos.columns]
+        
+        if not df_contratos.empty:
+            # Identifica a coluna de valor (valor, valor original, etc.)
+            col_valor = [c for c in df_contratos.columns if "valor" in c]
+            if col_valor:
+                df_contratos["valor_num"] = df_contratos[col_valor[0]].apply(limpar_valor_monetario)
+            else:
+                df_contratos["valor_num"] = 0.0
+
+        if not df_aditivo.empty:
+            df_aditivo.columns = [c.strip().upper() for c in df_aditivo.columns]
+            if "VALOR" in df_aditivo.columns:
+                df_aditivo["VALOR_NUM"] = df_aditivo["VALOR"].apply(limpar_valor_monetario)
+            else:
+                df_aditivo["VALOR_NUM"] = 0.0
             
         return df_contratos, df_aditivo
     except Exception as e:
@@ -128,6 +136,38 @@ else:
     LISTA_CONTRATOS = []
 
 # -----------------------------------------------------------------------------
+# Funções Auxiliares de Cálculo
+# -----------------------------------------------------------------------------
+def obter_totais_contrato(nro_contrato):
+    # Valor Original
+    df_c = df_contratos[df_contratos["contrato"] == nro_contrato]
+    valor_orig = float(df_c["valor_num"].iloc[0]) if not df_c.empty and "valor_num" in df_c.columns else 0.0
+
+    # Valor Aditivos
+    valor_adit = 0.0
+    if not df_aditivo.empty and "CONTRATO" in df_aditivo.columns:
+        df_ad_filtrado = df_aditivo[
+            (df_aditivo["CONTRATO"] == nro_contrato) & 
+            (df_aditivo["TIPO"].astype(str).str.upper() == "ADITIVO DE VALOR")
+        ]
+        if not df_ad_filtrado.empty:
+            valor_adit = float(df_ad_filtrado["VALOR_NUM"].sum())
+
+    # Valor Total Medido
+    col_contrato_med = "contrato" if "contrato" in df_medicao.columns else ("CONTRATO" if "CONTRATO" in df_medicao.columns else None)
+    valor_medido = 0.0
+    if not df_medicao.empty and col_contrato_med:
+        df_med_filtrado = df_medicao[df_medicao[col_contrato_med] == nro_contrato]
+        if not df_med_filtrado.empty and "valor_num" in df_med_filtrado.columns:
+            valor_medido = float(df_med_filtrado["valor_num"].sum())
+
+    valor_total = valor_orig + valor_adit
+    saldo = valor_total - valor_medido
+    pct_exec = (valor_medido / valor_total * 100) if valor_total > 0 else 0.0
+
+    return valor_orig, valor_adit, valor_total, valor_medido, saldo, pct_exec
+
+# -----------------------------------------------------------------------------
 # Funções de Visão e Renderização
 # -----------------------------------------------------------------------------
 def exibir_vencimentos():
@@ -145,8 +185,9 @@ def exibir_dados_gerais(nro_contrato):
         return
         
     linha = df_filtrado.iloc[0]
-    valor_bruto = linha.get("valor_num", 0.0)
-    valor_fmt = f"R$ {valor_bruto:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    
+    valor_orig, _, _, _, _, _ = obter_totais_contrato(nro_contrato)
+    valor_fmt = f"R$ {valor_orig:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     
     dt_inicio = pd.to_datetime(linha.get("inicio"), errors='coerce').strftime("%d/%m/%Y") if pd.notna(linha.get("inicio")) else "-"
     dt_fim = pd.to_datetime(linha.get("fim"), errors='coerce').strftime("%d/%m/%Y") if pd.notna(linha.get("fim")) else "-"
@@ -162,6 +203,23 @@ def exibir_dados_gerais(nro_contrato):
         st.markdown(f"**INÍCIO:** {dt_inicio}")
         st.markdown(f"**FIM:** {dt_fim}")
         st.markdown(f"**SITUAÇÃO:** {linha.get('situacao', '-')}")
+
+def exibir_resumo_financeiro(nro_contrato):
+    st.subheader("📊 Resumo Financeiro do Contrato")
+    
+    valor_orig, valor_adit, valor_total, valor_medido, saldo, pct_exec = obter_totais_contrato(nro_contrato)
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Valor Original do Contrato", f"R$ {valor_orig:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    c2.metric("Total em Aditivos", f"R$ {valor_adit:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    c3.metric("Valor Total Atualizado", f"R$ {valor_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+    st.markdown("---")
+
+    c4, c5, c6 = st.columns(3)
+    c4.metric("Total Medido", f"R$ {valor_medido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    c5.metric("Percentual Executado", f"{pct_exec:.2f} %")
+    c6.metric("Saldo Restante + Aditivos", f"R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
 def exibir_aditivos(nro_contrato):
     st.subheader("📑 Aditivos do Contrato")
@@ -195,7 +253,6 @@ def exibir_aditivos(nro_contrato):
 def exibir_medicoes(nro_contrato):
     st.subheader("📏 Medições Realizadas")
     
-    # Normalização de busca do contrato nas medições (case-insensitive para coluna)
     col_contrato_med = "contrato" if "contrato" in df_medicao.columns else ("CONTRATO" if "CONTRATO" in df_medicao.columns else None)
     
     if df_medicao.empty or col_contrato_med is None:
@@ -204,30 +261,13 @@ def exibir_medicoes(nro_contrato):
 
     df_selecao = df_medicao[df_medicao[col_contrato_med] == nro_contrato].copy()
     
-    # Obter Valor do Contrato Original
-    df_c = df_contratos[df_contratos["contrato"] == nro_contrato]
-    valor_contrato_orig = float(df_c["valor_num"].iloc[0]) if not df_c.empty and "valor_num" in df_c.columns else 0.0
-
-    # Obter Valor Total dos Aditivos de Valor
-    valor_aditivos = 0.0
-    if not df_aditivo.empty and "CONTRATO" in df_aditivo.columns:
-        df_ad_filtrado = df_aditivo[
-            (df_aditivo["CONTRATO"] == nro_contrato) & 
-            (df_aditivo["TIPO"].astype(str).str.upper() == "ADITIVO DE VALOR")
-        ]
-        if not df_ad_filtrado.empty:
-            valor_aditivos = float(df_ad_filtrado["VALOR_NUM"].sum())
-    
-    valor_total_contrato = valor_contrato_orig + valor_aditivos
+    _, _, valor_total_contrato, _, _, _ = obter_totais_contrato(nro_contrato)
     
     if not df_selecao.empty:
-        # Garante a ordenação caso exista data de medição/id para calcular acumulados na ordem correta
         if "id" in df_selecao.columns:
             df_selecao = df_selecao.sort_values(by="id")
             
         df_selecao["VALOR MEDIDO"] = df_selecao["valor_num"]
-        
-        # Cálculos das Colunas Solicitadas
         df_selecao["ACUMULADO ANTERIOR"] = df_selecao["VALOR MEDIDO"].cumsum() - df_selecao["VALOR MEDIDO"]
         df_selecao["ACUMULADO ATUAL"] = df_selecao["VALOR MEDIDO"].cumsum()
         df_selecao["SALDO RESTANTE"] = valor_total_contrato - df_selecao["ACUMULADO ATUAL"]
@@ -248,18 +288,8 @@ def exibir_medicoes(nro_contrato):
                 "% EXECUTADO DO CONTRATO": st.column_config.NumberColumn("% CONTRATO", format="%.2f %%")
             }
         )
-
-    total_medido = float(df_selecao["VALOR MEDIDO"].sum()) if not df_selecao.empty else 0.0
-    saldo = valor_total_contrato - total_medido
-    porcento = (total_medido / valor_total_contrato * 100) if valor_total_contrato > 0 else 0.0
-
-    st.markdown("---")
-    st.markdown("### 📊 Resumo Financeiro")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Valor Contrato + Aditivos", f"R$ {valor_total_contrato:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-    c2.metric("Total Medido", f"R$ {total_medido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-    c3.metric("Percentual Executado", f"{porcento:.2f} %")
-    c4.metric("Saldo + Aditivos", f"R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    else:
+        st.info("Nenhuma medição encontrada para este contrato.")
 
 def exibir_graficos(nro_contrato):
     st.subheader("📈 Evolução das Medições")
@@ -301,8 +331,9 @@ else:
 
     st.title(f"Contrato: {escolha}")
     
-    aba_dados, aba_medicoes, aba_aditivos, aba_grafico = st.tabs([
+    aba_dados, aba_resumo, aba_medicoes, aba_aditivos, aba_grafico = st.tabs([
         "📋 Dados do Contrato", 
+        "📊 Resumo Financeiro",
         "📏 Medições", 
         "📑 Aditivos", 
         "📈 Gráfico"
@@ -310,6 +341,9 @@ else:
     
     with aba_dados:
         exibir_dados_gerais(nro_contrato)
+
+    with aba_resumo:
+        exibir_resumo_financeiro(nro_contrato)
         
     with aba_medicoes:
         exibir_medicoes(nro_contrato)
