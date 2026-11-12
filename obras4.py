@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import pandas as pd
 import datetime
@@ -22,13 +23,14 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+import re  # Certifique-se de ter este import no topo do arquivo
+
 # -----------------------------------------------------------------------------
 # Função Auxiliar para Tratamento Monetário / Numérico
 # -----------------------------------------------------------------------------
 def limpar_valor_monetario(valor) -> float:
     """
-    Converte com segurança qualquer formato de valor (string com R$, ponto, vírgula, int, float)
-    para o tipo float nativo do Python.
+    Converte qualquer formato monetário (R$, espaços invisíveis, pontos e vírgulas) para float.
     """
     if pd.isna(valor) or valor is None:
         return 0.0
@@ -36,11 +38,18 @@ def limpar_valor_monetario(valor) -> float:
     if isinstance(valor, (int, float)):
         return float(valor)
     
-    val_str = str(valor).strip()
-    val_str = val_str.replace("R$", "").replace(" ", "")
+    # Remove tudo que não for número, vírgula, ponto ou sinal negativo (elimina R$, \xa0, etc.)
+    val_str = re.sub(r"[^\d,.-]", "", str(valor).strip())
     
+    if not val_str:
+        return 0.0
+
+    # Trata formato brasileiro (1.234,56) vs americano (1,234.56 ou 1234.56)
     if "," in val_str and "." in val_str:
-        val_str = val_str.replace(".", "").replace(",", ".")
+        if val_str.rfind(",") > val_str.rfind("."):
+            val_str = val_str.replace(".", "").replace(",", ".")
+        else:
+            val_str = val_str.replace(",", "")
     elif "," in val_str:
         val_str = val_str.replace(",", ".")
         
@@ -52,27 +61,23 @@ def limpar_valor_monetario(valor) -> float:
 # -----------------------------------------------------------------------------
 # Conexão e Leitura do Supabase
 # -----------------------------------------------------------------------------
-@st.cache_resource
-def init_supabase() -> Client:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    if not url or not key:
-        st.error("⚠️ Configuração ausente: Verifique se 'SUPABASE_URL' e 'SUPABASE_KEY' estão definidas no secrets.toml.")
-        st.stop()
-        
-    return create_client(url, key)
-
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def carregar_medicoes_supabase():
     try:
         supabase = init_supabase()
         response = supabase.table("bdmedicaonova").select("*").execute()
         df = pd.DataFrame(response.data)
         
-        if not df.empty and "valor" in df.columns:
-            df["valor_num"] = df["valor"].apply(limpar_valor_monetario)
-        elif not df.empty:
-            df["valor_num"] = 0.0
+        if not df.empty:
+            df.columns = [c.strip() for c in df.columns]
+            # Busca qualquer coluna que contenha "valor" ou "vlr" (maiúsculo ou minúsculo)
+            col_valor = [c for c in df.columns if "valor" in c.lower() or "vlr" in c.lower()]
+            
+            if col_valor:
+                df["valor_num"] = df[col_valor[0]].apply(limpar_valor_monetario)
+            else:
+                st.warning(f"⚠️ Coluna de valor não encontrada no Supabase. Colunas: {list(df.columns)}")
+                df["valor_num"] = 0.0
             
         return df
     except Exception as e:
@@ -82,10 +87,9 @@ def carregar_medicoes_supabase():
 # -----------------------------------------------------------------------------
 # Leitura e Cache dos Dados do Google Sheets
 # -----------------------------------------------------------------------------
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def carregar_google_sheets():
     SHEET_ID = "1ANxy7fkVPYlldx7_N3Ywm8J8J5aBIX5mKFBpy4E_h_Y"
-    
     GID_PLANILHA1 = "1888864733"
     GID_PLANILHA5 = "228487117"
     
@@ -96,22 +100,31 @@ def carregar_google_sheets():
         df_contratos = pd.read_csv(url_planilha1)
         df_aditivo = pd.read_csv(url_planilha5)
         
-        # Padronização de colunas
-        df_contratos.columns = [c.strip().lower() for c in df_contratos.columns]
-        
+        # --- Tratamento Contratos ---
         if not df_contratos.empty:
-            # Identifica a coluna de valor (valor, valor original, etc.)
-            col_valor = [c for c in df_contratos.columns if "valor" in c]
-            if col_valor:
-                df_contratos["valor_num"] = df_contratos[col_valor[0]].apply(limpar_valor_monetario)
+            df_contratos.columns = [c.strip().lower() for c in df_contratos.columns]
+            if "contrato" in df_contratos.columns:
+                df_contratos["contrato"] = df_contratos["contrato"].astype(str).str.strip()
+            
+            # Procura coluna com "valor" ou "vlr"
+            col_valor_c = [c for c in df_contratos.columns if "valor" in c or "vlr" in c]
+            if col_valor_c:
+                df_contratos["valor_num"] = df_contratos[col_valor_c[0]].apply(limpar_valor_monetario)
             else:
+                st.warning(f"⚠️ Coluna de valor não encontrada na aba Contratos. Colunas lidas: {list(df_contratos.columns)}")
                 df_contratos["valor_num"] = 0.0
 
+        # --- Tratamento Aditivos ---
         if not df_aditivo.empty:
             df_aditivo.columns = [c.strip().upper() for c in df_aditivo.columns]
-            if "VALOR" in df_aditivo.columns:
-                df_aditivo["VALOR_NUM"] = df_aditivo["VALOR"].apply(limpar_valor_monetario)
+            if "CONTRATO" in df_aditivo.columns:
+                df_aditivo["CONTRATO"] = df_aditivo["CONTRATO"].astype(str).str.strip()
+                
+            col_valor_a = [c for c in df_aditivo.columns if "VALOR" in c or "VLR" in c]
+            if col_valor_a:
+                df_aditivo["VALOR_NUM"] = df_aditivo[col_valor_a[0]].apply(limpar_valor_monetario)
             else:
+                st.warning(f"⚠️ Coluna de valor não encontrada na aba Aditivos. Colunas lidas: {list(df_aditivo.columns)}")
                 df_aditivo["VALOR_NUM"] = 0.0
             
         return df_contratos, df_aditivo
@@ -119,13 +132,44 @@ def carregar_google_sheets():
         st.error(f"Erro ao carregar dados do Google Sheets: {e}")
         return pd.DataFrame(), pd.DataFrame()
 
-# Carregamento Unificado dos Dados
-try:
-    df_contratos, df_aditivo = carregar_google_sheets()
-    df_medicao = carregar_medicoes_supabase()
-except Exception as e:
-    st.error(f"Erro ao integrar fontes de dados: {e}")
-    st.stop()
+# -----------------------------------------------------------------------------
+# Funções Auxiliares de Cálculo
+# -----------------------------------------------------------------------------
+def obter_totais_contrato(nro_contrato):
+    nro_str = str(nro_contrato).strip()
+
+    # 1. Valor Original
+    valor_orig = 0.0
+    if not df_contratos.empty and "contrato" in df_contratos.columns:
+        df_c = df_contratos[df_contratos["contrato"] == nro_str]
+        if not df_c.empty and "valor_num" in df_c.columns:
+            valor_orig = float(df_c["valor_num"].iloc[0])
+
+    # 2. Valor Aditivos
+    valor_adit = 0.0
+    if not df_aditivo.empty and "CONTRATO" in df_aditivo.columns:
+        df_ad_filtrado = df_aditivo[df_aditivo["CONTRATO"] == nro_str]
+        # Se existir a coluna TIPO, filtra por aditivo de valor (ignorando acentos/espaços)
+        if "TIPO" in df_ad_filtrado.columns:
+            df_ad_filtrado = df_ad_filtrado[
+                df_ad_filtrado["TIPO"].astype(str).str.upper().str.contains("VALOR", na=False)
+            ]
+        if not df_ad_filtrado.empty and "VALOR_NUM" in df_ad_filtrado.columns:
+            valor_adit = float(df_ad_filtrado["VALOR_NUM"].sum())
+
+    # 3. Valor Total Medido
+    col_contrato_med = "contrato" if "contrato" in df_medicao.columns else ("CONTRATO" if "CONTRATO" in df_medicao.columns else None)
+    valor_medido = 0.0
+    if not df_medicao.empty and col_contrato_med:
+        df_med_filtrado = df_medicao[df_medicao[col_contrato_med].astype(str).str.strip() == nro_str]
+        if not df_med_filtrado.empty and "valor_num" in df_med_filtrado.columns:
+            valor_medido = float(df_med_filtrado["valor_num"].sum())
+
+    valor_total = valor_orig + valor_adit
+    saldo = valor_total - valor_medido
+    pct_exec = (valor_medido / valor_total * 100) if valor_total > 0 else 0.0
+
+    return valor_orig, valor_adit, valor_total, valor_medido, saldo, pct_exec
 
 # -----------------------------------------------------------------------------
 # Mapeamento e Dinamização de Contratos
