@@ -238,7 +238,8 @@ def exibir_aditivos(nro_contrato):
         st.info("Tabela de aditivos vazia ou mal formatada.")
         return
 
-    df_filtrado = df_aditivo[df_aditivo["CONTRATO"] == nro_contrato].copy()
+    ##df_filtrado = df_aditivo[df_aditivo["CONTRATO"] == nro_contrato].copy()
+    df_filtrado = df_aditivo[df_aditivo["CONTRATO"].astype(str).str.strip() == str(nro_contrato).strip()].copy()
     
     if df_filtrado.empty:
         st.info("Nenhum aditivo registrado para este contrato.")
@@ -270,8 +271,8 @@ def exibir_medicoes(nro_contrato):
         st.info("Nenhum dado de medição disponível no Supabase.")
         return
 
-    df_selecao = df_medicao[df_medicao[col_contrato_med] == nro_contrato].copy()
-    
+    ##df_selecao = df_medicao[df_medicao[col_contrato_med] == nro_contrato].copy()
+    df_selecao = df_medicao[df_medicao[col_contrato_med].astype(str).str.strip() == str(nro_contrato).strip()].copy()
     _, _, valor_total_contrato, _, _, _ = obter_totais_contrato(nro_contrato)
     
     if not df_selecao.empty:
