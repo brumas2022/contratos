@@ -56,11 +56,24 @@ def limpar_valor_monetario(valor) -> float:
     except (ValueError, TypeError):
         return 0.0
 
+def formatar_moeda(valor: float) -> str:
+    """Formata float para padrão monetário brasileiro (R$ 1.234,56)."""
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 # -----------------------------------------------------------------------------
 # Conexão e Leitura do Supabase
 # -----------------------------------------------------------------------------
+@st.cache_resource
+def init_supabase() -> Client:
+    url = st.secrets.get("SUPABASE_URL")
+    key = st.secrets.get("SUPABASE_KEY")
+    if not url or not key:
+        st.error("⚠️ Configuração ausente: Verifique se 'SUPABASE_URL' e 'SUPABASE_KEY' estão definidas no secrets.toml.")
+        st.stop()
+    return create_client(url, key)
+
 @st.cache_data(ttl=60)
-def carregar_medicoes_supabase():
+def carregar_medicoes_supabase() -> pd.DataFrame:
     try:
         supabase = init_supabase()
         response = supabase.table("bdmedicaonova").select("*").execute()
@@ -68,7 +81,6 @@ def carregar_medicoes_supabase():
         
         if not df.empty:
             df.columns = [c.strip() for c in df.columns]
-            # Busca qualquer coluna que contenha "valor" ou "vlr" (maiúsculo ou minúsculo)
             col_valor = [c for c in df.columns if "valor" in c.lower() or "vlr" in c.lower()]
             
             if col_valor:
@@ -104,7 +116,6 @@ def carregar_google_sheets():
             if "contrato" in df_contratos.columns:
                 df_contratos["contrato"] = df_contratos["contrato"].astype(str).str.strip()
             
-            # Procura coluna com "valor" ou "vlr"
             col_valor_c = [c for c in df_contratos.columns if "valor" in c or "vlr" in c]
             if col_valor_c:
                 df_contratos["valor_num"] = df_contratos[col_valor_c[0]].apply(limpar_valor_monetario)
@@ -130,11 +141,20 @@ def carregar_google_sheets():
         st.error(f"Erro ao carregar dados do Google Sheets: {e}")
         return pd.DataFrame(), pd.DataFrame()
 
-    if not df_contratos.empty and "contrato" in df_contratos.columns:
-       LISTA_CONTRATOS = df_contratos["contrato"].dropna().unique().tolist()
-    else:
-       LISTA_CONTRATOS = []
+# -----------------------------------------------------------------------------
+# Carregamento Unificado e Mapeamento de Contratos
+# -----------------------------------------------------------------------------
+try:
+    df_contratos, df_aditivo = carregar_google_sheets()
+    df_medicao = carregar_medicoes_supabase()
+except Exception as e:
+    st.error(f"Erro ao integrar fontes de dados: {e}")
+    st.stop()
 
+if not df_contratos.empty and "contrato" in df_contratos.columns:
+    LISTA_CONTRATOS = sorted(df_contratos["contrato"].dropna().unique().tolist())
+else:
+    LISTA_CONTRATOS = []
 
 # -----------------------------------------------------------------------------
 # Funções Auxiliares de Cálculo
@@ -153,7 +173,6 @@ def obter_totais_contrato(nro_contrato):
     valor_adit = 0.0
     if not df_aditivo.empty and "CONTRATO" in df_aditivo.columns:
         df_ad_filtrado = df_aditivo[df_aditivo["CONTRATO"] == nro_str]
-        # Se existir a coluna TIPO, filtra por aditivo de valor (ignorando acentos/espaços)
         if "TIPO" in df_ad_filtrado.columns:
             df_ad_filtrado = df_ad_filtrado[
                 df_ad_filtrado["TIPO"].astype(str).str.upper().str.contains("VALOR", na=False)
@@ -176,15 +195,6 @@ def obter_totais_contrato(nro_contrato):
     return valor_orig, valor_adit, valor_total, valor_medido, saldo, pct_exec
 
 # -----------------------------------------------------------------------------
-# Mapeamento e Dinamização de Contratos
-# -----------------------------------------------------------------------------
-##if not df_contratos.empty and "contrato" in df_contratos.columns:
-##    LISTA_CONTRATOS = df_contratos["contrato"].dropna().unique().tolist()
-##else:
-##    LISTA_CONTRATOS = []
-
-
-# -----------------------------------------------------------------------------
 # Funções de Visão e Renderização
 # -----------------------------------------------------------------------------
 def exibir_vencimentos():
@@ -192,19 +202,18 @@ def exibir_vencimentos():
     try:
         contratos_vencer = pd.read_excel("abril-2026.xlsx", sheet_name=0)
         st.dataframe(contratos_vencer, use_container_width=True)
-    except Exception as e:
+    except Exception:
         st.info("Nenhum arquivo de vencimentos pendentes localizado.")
 
 def exibir_dados_gerais(nro_contrato):
-    df_filtrado = df_contratos[df_contratos["contrato"] == nro_contrato]
+    nro_str = str(nro_contrato).strip()
+    df_filtrado = df_contratos[df_contratos["contrato"] == nro_str]
     if df_filtrado.empty:
         st.warning("Dados do contrato não encontrados.")
         return
         
     linha = df_filtrado.iloc[0]
-    
-    valor_orig, _, _, _, _, _ = obter_totais_contrato(nro_contrato)
-    valor_fmt = f"R$ {valor_orig:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    valor_orig, _, _, _, _, _ = obter_totais_contrato(nro_str)
     
     dt_inicio = pd.to_datetime(linha.get("inicio"), errors='coerce').strftime("%d/%m/%Y") if pd.notna(linha.get("inicio")) else "-"
     dt_fim = pd.to_datetime(linha.get("fim"), errors='coerce').strftime("%d/%m/%Y") if pd.notna(linha.get("fim")) else "-"
@@ -214,7 +223,7 @@ def exibir_dados_gerais(nro_contrato):
         st.markdown(f"**CONTRATO:** {linha.get('contrato', '-')}")
         st.markdown(f"**EMPRESA:** {linha.get('empresa', '-')}")
         st.markdown(f"**OBJETO:** {linha.get('objeto', '-')}")
-        st.markdown(f"**VALOR ORIGINAL:** {valor_fmt}")
+        st.markdown(f"**VALOR ORIGINAL:** {formatar_moeda(valor_orig)}")
     with col2:
         st.markdown(f"**FISCAL:** {linha.get('fiscal', '-')}")
         st.markdown(f"**INÍCIO:** {dt_inicio}")
@@ -227,16 +236,16 @@ def exibir_resumo_financeiro(nro_contrato):
     valor_orig, valor_adit, valor_total, valor_medido, saldo, pct_exec = obter_totais_contrato(nro_contrato)
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Valor Original do Contrato", f"R$ {valor_orig:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-    c2.metric("Total em Aditivos", f"R$ {valor_adit:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-    c3.metric("Valor Total Atualizado", f"R$ {valor_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    c1.metric("Valor Original do Contrato", formatar_moeda(valor_orig))
+    c2.metric("Total em Aditivos", formatar_moeda(valor_adit))
+    c3.metric("Valor Total Atualizado", formatar_moeda(valor_total))
 
     st.markdown("---")
 
     c4, c5, c6 = st.columns(3)
-    c4.metric("Total Medido", f"R$ {valor_medido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    c4.metric("Total Medido", formatar_moeda(valor_medido))
     c5.metric("Percentual Executado", f"{pct_exec:.2f} %")
-    c6.metric("Saldo Restante + Aditivos", f"R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    c6.metric("Saldo Restante + Aditivos", formatar_moeda(saldo))
 
 def exibir_aditivos(nro_contrato):
     st.subheader("📑 Aditivos do Contrato")
@@ -244,8 +253,7 @@ def exibir_aditivos(nro_contrato):
         st.info("Tabela de aditivos vazia ou mal formatada.")
         return
 
-    ##df_filtrado = df_aditivo[df_aditivo["CONTRATO"] == nro_contrato].copy()
-    df_filtrado = df_aditivo[df_aditivo["CONTRATO"].astype(str).str.strip() == str(nro_contrato).strip()].copy()
+    df_filtrado = df_aditivo[df_aditivo["CONTRATO"] == str(nro_contrato).strip()].copy()
     
     if df_filtrado.empty:
         st.info("Nenhum aditivo registrado para este contrato.")
@@ -277,7 +285,6 @@ def exibir_medicoes(nro_contrato):
         st.info("Nenhum dado de medição disponível no Supabase.")
         return
 
-    ##df_selecao = df_medicao[df_medicao[col_contrato_med] == nro_contrato].copy()
     df_selecao = df_medicao[df_medicao[col_contrato_med].astype(str).str.strip() == str(nro_contrato).strip()].copy()
     _, _, valor_total_contrato, _, _, _ = obter_totais_contrato(nro_contrato)
     
@@ -317,7 +324,7 @@ def exibir_graficos(nro_contrato):
         st.info("Sem dados de medição suficientes para gerar gráficos.")
         return
 
-    df_selecao = df_medicao[df_medicao[col_contrato] == nro_contrato]
+    df_selecao = df_medicao[df_medicao[col_contrato].astype(str).str.strip() == str(nro_contrato).strip()]
     
     if df_selecao.empty or "valor_num" not in df_selecao.columns:
         st.info("Sem dados de medição suficientes para gerar gráficos.")
