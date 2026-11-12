@@ -325,6 +325,11 @@ def exibir_graficos(nro_contrato):
 # -----------------------------------------------------------------------------
 st.sidebar.title("🏢 Gestão de Contratos")
 
+if not df_contratos.empty and "contrato" in df_contratos.columns:
+    LISTA_CONTRATOS = df_contratos["contrato"].dropna().unique().tolist()
+else:
+    LISTA_CONTRATOS = []
+
 opcoes_menu = ["-- Selecione um Contrato --", "🗓️ Ver Vencimentos"] + LISTA_CONTRATOS
 escolha = st.sidebar.selectbox("Escolha uma opção:", opcoes_menu)
 
