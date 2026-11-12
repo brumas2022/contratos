@@ -172,10 +172,10 @@ def obter_totais_contrato(nro_contrato):
 # -----------------------------------------------------------------------------
 # Mapeamento e Dinamização de Contratos
 # -----------------------------------------------------------------------------
-if not df_contratos.empty and "contrato" in df_contratos.columns:
-    LISTA_CONTRATOS = df_contratos["contrato"].dropna().unique().tolist()
-else:
-    LISTA_CONTRATOS = []
+##if not df_contratos.empty and "contrato" in df_contratos.columns:
+##    LISTA_CONTRATOS = df_contratos["contrato"].dropna().unique().tolist()
+##else:
+##    LISTA_CONTRATOS = []
 
 
 # -----------------------------------------------------------------------------
