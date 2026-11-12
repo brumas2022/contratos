@@ -177,37 +177,6 @@ if not df_contratos.empty and "contrato" in df_contratos.columns:
 else:
     LISTA_CONTRATOS = []
 
-# -----------------------------------------------------------------------------
-# Funções Auxiliares de Cálculo
-# -----------------------------------------------------------------------------
-def obter_totais_contrato(nro_contrato):
-    # Valor Original
-    df_c = df_contratos[df_contratos["contrato"] == nro_contrato]
-    valor_orig = float(df_c["valor_num"].iloc[0]) if not df_c.empty and "valor_num" in df_c.columns else 0.0
-
-    # Valor Aditivos
-    valor_adit = 0.0
-    if not df_aditivo.empty and "CONTRATO" in df_aditivo.columns:
-        df_ad_filtrado = df_aditivo[
-            (df_aditivo["CONTRATO"] == nro_contrato) & 
-            (df_aditivo["TIPO"].astype(str).str.upper() == "ADITIVO DE VALOR")
-        ]
-        if not df_ad_filtrado.empty:
-            valor_adit = float(df_ad_filtrado["VALOR_NUM"].sum())
-
-    # Valor Total Medido
-    col_contrato_med = "contrato" if "contrato" in df_medicao.columns else ("CONTRATO" if "CONTRATO" in df_medicao.columns else None)
-    valor_medido = 0.0
-    if not df_medicao.empty and col_contrato_med:
-        df_med_filtrado = df_medicao[df_medicao[col_contrato_med] == nro_contrato]
-        if not df_med_filtrado.empty and "valor_num" in df_med_filtrado.columns:
-            valor_medido = float(df_med_filtrado["valor_num"].sum())
-
-    valor_total = valor_orig + valor_adit
-    saldo = valor_total - valor_medido
-    pct_exec = (valor_medido / valor_total * 100) if valor_total > 0 else 0.0
-
-    return valor_orig, valor_adit, valor_total, valor_medido, saldo, pct_exec
 
 # -----------------------------------------------------------------------------
 # Funções de Visão e Renderização
