@@ -23,8 +23,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-import re  # Certifique-se de ter este import no topo do arquivo
-
 # -----------------------------------------------------------------------------
 # Função Auxiliar para Tratamento Monetário / Numérico
 # -----------------------------------------------------------------------------
