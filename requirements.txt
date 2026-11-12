@@ -6,4 +6,4 @@ openpyxl
 supabase
 gspread 
 google-auth
-re
+
