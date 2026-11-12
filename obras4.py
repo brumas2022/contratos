@@ -130,10 +130,10 @@ def carregar_google_sheets():
         st.error(f"Erro ao carregar dados do Google Sheets: {e}")
         return pd.DataFrame(), pd.DataFrame()
 
-if not df_contratos.empty and "contrato" in df_contratos.columns:
-   LISTA_CONTRATOS = df_contratos["contrato"].dropna().unique().tolist()
-else:
-   LISTA_CONTRATOS = []
+    if not df_contratos.empty and "contrato" in df_contratos.columns:
+       LISTA_CONTRATOS = df_contratos["contrato"].dropna().unique().tolist()
+    else:
+       LISTA_CONTRATOS = []
 
 
 # -----------------------------------------------------------------------------
